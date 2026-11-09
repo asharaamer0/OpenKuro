@@ -1,0 +1,45 @@
+<Window x:Class="Kuro.UI.CompositionSettingsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Composition Settings" Width="442" SizeToContent="Height"
+        ShowInTaskbar="False" ResizeMode="NoResize" WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource Panel}" Foreground="{DynamicResource Text}"
+        FontFamily="Segoe UI" FontSize="12" UseLayoutRounding="True">
+ <Window.Resources>
+  <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource MutedText}">
+   <Setter Property="Margin" Value="0,0,0,6"/>
+  </Style>
+ </Window.Resources>
+ <Grid>
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <StackPanel Margin="20,18,20,13">
+   <TextBlock Text="Name" Style="{StaticResource FieldLabel}"/>
+   <TextBox x:Name="NameField" AutomationProperties.Name="Composition name"/>
+   <TextBlock Text="Resolution preset" Style="{StaticResource FieldLabel}" Margin="0,15,0,6"/>
+   <ComboBox x:Name="Resolution" DisplayMemberPath="Label" AutomationProperties.Name="Resolution preset"/>
+   <Grid Margin="0,14,0,0">
+    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition Width="1.2*"/></Grid.ColumnDefinitions>
+    <StackPanel><TextBlock Text="Width · px" Style="{StaticResource FieldLabel}"/><TextBox x:Name="WidthField" AutomationProperties.Name="Width in pixels"/></StackPanel>
+    <StackPanel Grid.Column="2"><TextBlock Text="Height · px" Style="{StaticResource FieldLabel}"/><TextBox x:Name="HeightField" AutomationProperties.Name="Height in pixels"/></StackPanel>
+    <StackPanel Grid.Column="4"><TextBlock Text="Aspect ratio" Style="{StaticResource FieldLabel}"/><ComboBox x:Name="Aspect" DisplayMemberPath="Label" AutomationProperties.Name="Aspect ratio" ToolTip="Uses the current long edge to size the composition"/></StackPanel>
+   </Grid>
+   <Grid Margin="0,14,0,0">
+    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
+    <StackPanel><TextBlock Text="Frame rate" Style="{StaticResource FieldLabel}"/><ComboBox x:Name="FrameRates" DisplayMemberPath="Label" AutomationProperties.Name="Frame rate" ToolTip="Changing FPS preserves the frame numbers of clips, keyframes, and markers"/></StackPanel>
+    <StackPanel Grid.Column="2"><TextBlock Text="Duration · HH:MM:SS:mmm" Style="{StaticResource FieldLabel}"/><TextBox x:Name="DurationField" FontFamily="Consolas" AutomationProperties.Name="Duration in hours, minutes, seconds, and milliseconds" ToolTip="Hours, minutes, seconds, and milliseconds. MM:SS also works."/></StackPanel>
+   </Grid>
+   <TextBlock Text="Background" Style="{StaticResource FieldLabel}" Margin="0,14,0,6"/>
+   <DockPanel>
+    <Border x:Name="BackgroundSwatch" DockPanel.Dock="Left" Width="29" Margin="0,0,8,0" CornerRadius="4" BorderBrush="{DynamicResource Border}" BorderThickness="1"/>
+    <TextBox x:Name="BackgroundField" AutomationProperties.Name="Background color" ToolTip="#RRGGBB or #AARRGGBB"/>
+   </DockPanel>
+   <TextBlock x:Name="Error" Foreground="{DynamicResource Error}" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,10,0,0"/>
+  </StackPanel>
+  <Border Grid.Row="1" BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0" Background="{DynamicResource Workspace}" Padding="14,9">
+   <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+    <Button Content="Cancel" IsCancel="True" Margin="0,0,6,0"/>
+    <Button x:Name="ApplyButton" Content="Apply" IsDefault="True" Style="{StaticResource PrimaryButton}" MinWidth="72" Click="Apply"/>
+   </StackPanel>
+  </Border>
+ </Grid>
+</Window>

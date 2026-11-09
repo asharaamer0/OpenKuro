@@ -1,0 +1,14 @@
+**/bin/
+**/obj/
+artifacts/
+.vs/
+*.user
+*.partial.*
+.env
+*.key
+dist/
+/prompt.md
+/True Motion/
+/*.txt
+*.kuro.bak
+.env.*

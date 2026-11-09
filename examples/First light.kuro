@@ -1,0 +1,538 @@
+{
+  "Version": 1,
+  "Id": "b8bac4ed59c340e4b830dcca0c921203",
+  "Name": "First light",
+  "Revision": 11,
+  "Assets": [
+    {
+      "Id": "2d376f2016ed417c8a732bfd3a9971dd",
+      "Name": "First light.mp4",
+      "Path": "First light.mp4",
+      "Kind": "Video",
+      "Bin": "Footage",
+      "Width": 1920,
+      "Height": 1080,
+      "Duration": 8,
+      "FrameRate": 30,
+      "HasAudio": false
+    },
+    {
+      "Id": "07878131f4624f66adc0951d16e4b185",
+      "Name": "First light.png",
+      "Path": "First light.png",
+      "Kind": "Image",
+      "Bin": "Artwork",
+      "Width": 1920,
+      "Height": 1080,
+      "Duration": 5,
+      "FrameRate": 25,
+      "HasAudio": false
+    }
+  ],
+  "Compositions": [
+    {
+      "Id": "8e7aab51f00f476f855b1f67c4616546",
+      "Name": "First light · Main",
+      "Width": 1920,
+      "Height": 1080,
+      "Fps": {
+        "Numerator": 30,
+        "Denominator": 1
+      },
+      "Duration": 240,
+      "WorkStart": 0,
+      "WorkEnd": 240,
+      "Background": "#161616",
+      "Layers": [
+        {
+          "Id": "5bb554d2b77141b2a5f4b8312adb0998",
+          "Name": "Accent · persimmon rule",
+          "Kind": "Shape",
+          "AssetId": null,
+          "CompositionId": null,
+          "Start": 24,
+          "Duration": 216,
+          "SourceIn": 0,
+          "Rate": 1,
+          "Visible": true,
+          "Locked": false,
+          "Audio": true,
+          "Solo": false,
+          "Color": "#768789",
+          "Text": "Your next story.",
+          "Font": "Segoe UI",
+          "FontWeight": 400,
+          "Fill": "#E59A65",
+          "Shape": "Rectangle",
+          "Blend": "Normal",
+          "Preset": "",
+          "PresetDuration": 1,
+          "Seed": 42,
+          "Volume": 1,
+          "Properties": {
+            "x": {
+              "Value": 295,
+              "Keys": []
+            },
+            "y": {
+              "Value": 710,
+              "Keys": []
+            },
+            "anchorX": {
+              "Value": 0,
+              "Keys": []
+            },
+            "anchorY": {
+              "Value": 0,
+              "Keys": []
+            },
+            "scaleX": {
+              "Value": 100,
+              "Keys": []
+            },
+            "scaleY": {
+              "Value": 100,
+              "Keys": []
+            },
+            "rotation": {
+              "Value": 0,
+              "Keys": []
+            },
+            "opacity": {
+              "Value": 100,
+              "Keys": []
+            },
+            "fontSize": {
+              "Value": 96,
+              "Keys": []
+            },
+            "blur": {
+              "Value": 0,
+              "Keys": []
+            },
+            "glow": {
+              "Value": 0,
+              "Keys": []
+            },
+            "shadow": {
+              "Value": 0,
+              "Keys": []
+            },
+            "width": {
+              "Value": 54,
+              "Keys": []
+            },
+            "height": {
+              "Value": 3,
+              "Keys": []
+            },
+            "radius": {
+              "Value": 16,
+              "Keys": []
+            }
+          }
+        },
+        {
+          "Id": "99ca8101f4244731bd8efb098187309c",
+          "Name": "Caption · A film by you",
+          "Kind": "Text",
+          "AssetId": null,
+          "CompositionId": null,
+          "Start": 24,
+          "Duration": 216,
+          "SourceIn": 0,
+          "Rate": 1,
+          "Visible": true,
+          "Locked": false,
+          "Audio": true,
+          "Solo": false,
+          "Color": "#918C83",
+          "Text": "A quiet beginning.  A film by you.",
+          "Font": "Segoe UI",
+          "FontWeight": 600,
+          "Fill": "#FCFAF6",
+          "Shape": "Rectangle",
+          "Blend": "Normal",
+          "Preset": "",
+          "PresetDuration": 1,
+          "Seed": 42,
+          "Volume": 1,
+          "Properties": {
+            "x": {
+              "Value": 499,
+              "Keys": []
+            },
+            "y": {
+              "Value": 775,
+              "Keys": []
+            },
+            "anchorX": {
+              "Value": 0,
+              "Keys": []
+            },
+            "anchorY": {
+              "Value": 0,
+              "Keys": []
+            },
+            "scaleX": {
+              "Value": 100,
+              "Keys": []
+            },
+            "scaleY": {
+              "Value": 100,
+              "Keys": []
+            },
+            "rotation": {
+              "Value": 0,
+              "Keys": []
+            },
+            "opacity": {
+              "Value": 100,
+              "Keys": []
+            },
+            "fontSize": {
+              "Value": 25,
+              "Keys": []
+            },
+            "blur": {
+              "Value": 0,
+              "Keys": []
+            },
+            "glow": {
+              "Value": 0,
+              "Keys": []
+            },
+            "shadow": {
+              "Value": 0,
+              "Keys": []
+            },
+            "width": {
+              "Value": 480,
+              "Keys": []
+            },
+            "height": {
+              "Value": 240,
+              "Keys": []
+            },
+            "radius": {
+              "Value": 16,
+              "Keys": []
+            }
+          }
+        },
+        {
+          "Id": "0ebcc3955c854c83910c06ccf02fe5d8",
+          "Name": "Eyebrow · First light",
+          "Kind": "Text",
+          "AssetId": null,
+          "CompositionId": null,
+          "Start": 0,
+          "Duration": 240,
+          "SourceIn": 0,
+          "Rate": 1,
+          "Visible": true,
+          "Locked": false,
+          "Audio": true,
+          "Solo": false,
+          "Color": "#918C83",
+          "Text": "F I R S T   L I G H T",
+          "Font": "Segoe UI",
+          "FontWeight": 600,
+          "Fill": "#FCFAF6",
+          "Shape": "Rectangle",
+          "Blend": "Normal",
+          "Preset": "",
+          "PresetDuration": 1,
+          "Seed": 42,
+          "Volume": 1,
+          "Properties": {
+            "x": {
+              "Value": 443,
+              "Keys": []
+            },
+            "y": {
+              "Value": 282,
+              "Keys": []
+            },
+            "anchorX": {
+              "Value": 0,
+              "Keys": []
+            },
+            "anchorY": {
+              "Value": 0,
+              "Keys": []
+            },
+            "scaleX": {
+              "Value": 100,
+              "Keys": []
+            },
+            "scaleY": {
+              "Value": 100,
+              "Keys": []
+            },
+            "rotation": {
+              "Value": 0,
+              "Keys": []
+            },
+            "opacity": {
+              "Value": 100,
+              "Keys": []
+            },
+            "fontSize": {
+              "Value": 24,
+              "Keys": []
+            },
+            "blur": {
+              "Value": 0,
+              "Keys": []
+            },
+            "glow": {
+              "Value": 0,
+              "Keys": []
+            },
+            "shadow": {
+              "Value": 0,
+              "Keys": []
+            },
+            "width": {
+              "Value": 480,
+              "Keys": []
+            },
+            "height": {
+              "Value": 240,
+              "Keys": []
+            },
+            "radius": {
+              "Value": 16,
+              "Keys": []
+            }
+          }
+        },
+        {
+          "Id": "5056c6deaeb54bc789f06a210aec0d8f",
+          "Name": "Title · Small moments",
+          "Kind": "Text",
+          "AssetId": null,
+          "CompositionId": null,
+          "Start": 0,
+          "Duration": 240,
+          "SourceIn": 0,
+          "Rate": 1,
+          "Visible": true,
+          "Locked": false,
+          "Audio": true,
+          "Solo": false,
+          "Color": "#918C83",
+          "Text": "Small moments.\nLasting stories.",
+          "Font": "Segoe UI",
+          "FontWeight": 600,
+          "Fill": "#FAF3E6",
+          "Shape": "Rectangle",
+          "Blend": "Normal",
+          "Preset": "",
+          "PresetDuration": 1,
+          "Seed": 42,
+          "Volume": 1,
+          "Properties": {
+            "x": {
+              "Value": 660,
+              "Keys": []
+            },
+            "y": {
+              "Value": 470,
+              "Keys": [
+                {
+                  "Id": "175eadc46e694c79840baba82282c2bc",
+                  "Frame": 0,
+                  "Value": 550,
+                  "Interpolation": "Bezier",
+                  "OutX": 0.333333,
+                  "OutY": 0,
+                  "InX": 0.666667,
+                  "InY": 1
+                },
+                {
+                  "Id": "e488ff0e20214ddc80779cedb977b8d0",
+                  "Frame": 42,
+                  "Value": 470,
+                  "Interpolation": "Bezier",
+                  "OutX": 0.333333,
+                  "OutY": 0,
+                  "InX": 0.666667,
+                  "InY": 1
+                }
+              ]
+            },
+            "anchorX": {
+              "Value": 0,
+              "Keys": []
+            },
+            "anchorY": {
+              "Value": 0,
+              "Keys": []
+            },
+            "scaleX": {
+              "Value": 100,
+              "Keys": []
+            },
+            "scaleY": {
+              "Value": 100,
+              "Keys": []
+            },
+            "rotation": {
+              "Value": 0,
+              "Keys": []
+            },
+            "opacity": {
+              "Value": 100,
+              "Keys": [
+                {
+                  "Id": "52d079df7fa14772a1f7eff08f238303",
+                  "Frame": 0,
+                  "Value": 0,
+                  "Interpolation": "Bezier",
+                  "OutX": 0.333333,
+                  "OutY": 0,
+                  "InX": 0.666667,
+                  "InY": 1
+                },
+                {
+                  "Id": "c43739774e6347358befe9c855bccff3",
+                  "Frame": 32,
+                  "Value": 100,
+                  "Interpolation": "Bezier",
+                  "OutX": 0.333333,
+                  "OutY": 0,
+                  "InX": 0.666667,
+                  "InY": 1
+                }
+              ]
+            },
+            "fontSize": {
+              "Value": 108,
+              "Keys": []
+            },
+            "blur": {
+              "Value": 0,
+              "Keys": []
+            },
+            "glow": {
+              "Value": 0,
+              "Keys": []
+            },
+            "shadow": {
+              "Value": 0,
+              "Keys": []
+            },
+            "width": {
+              "Value": 480,
+              "Keys": []
+            },
+            "height": {
+              "Value": 240,
+              "Keys": []
+            },
+            "radius": {
+              "Value": 16,
+              "Keys": []
+            }
+          }
+        },
+        {
+          "Id": "0d1974759ca04893960510ba1c863cd3",
+          "Name": "Landscape · slow push",
+          "Kind": "Video",
+          "AssetId": "2d376f2016ed417c8a732bfd3a9971dd",
+          "CompositionId": null,
+          "Start": 0,
+          "Duration": 240,
+          "SourceIn": 0,
+          "Rate": 1,
+          "Visible": true,
+          "Locked": false,
+          "Audio": true,
+          "Solo": false,
+          "Color": "#757B8A",
+          "Text": "Your next story.",
+          "Font": "Segoe UI",
+          "FontWeight": 400,
+          "Fill": "#FCFAF6",
+          "Shape": "Rectangle",
+          "Blend": "Normal",
+          "Preset": "",
+          "PresetDuration": 1,
+          "Seed": 42,
+          "Volume": 1,
+          "Properties": {
+            "x": {
+              "Value": 960,
+              "Keys": []
+            },
+            "y": {
+              "Value": 540,
+              "Keys": []
+            },
+            "anchorX": {
+              "Value": 0,
+              "Keys": []
+            },
+            "anchorY": {
+              "Value": 0,
+              "Keys": []
+            },
+            "scaleX": {
+              "Value": 100,
+              "Keys": []
+            },
+            "scaleY": {
+              "Value": 100,
+              "Keys": []
+            },
+            "rotation": {
+              "Value": 0,
+              "Keys": []
+            },
+            "opacity": {
+              "Value": 100,
+              "Keys": []
+            },
+            "fontSize": {
+              "Value": 96,
+              "Keys": []
+            },
+            "blur": {
+              "Value": 0,
+              "Keys": []
+            },
+            "glow": {
+              "Value": 0,
+              "Keys": []
+            },
+            "shadow": {
+              "Value": 0,
+              "Keys": []
+            },
+            "width": {
+              "Value": 480,
+              "Keys": []
+            },
+            "height": {
+              "Value": 240,
+              "Keys": []
+            },
+            "radius": {
+              "Value": 16,
+              "Keys": []
+            }
+          }
+        }
+      ],
+      "Markers": [
+        42,
+        120,
+        210
+      ]
+    }
+  ],
+  "ActiveComposition": ""
+}
