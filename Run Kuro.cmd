@@ -1,2 +1,2 @@
 @echo off
-start "Kuro" "%~dp0dist\Kuro-0.1.5\Kuro.exe" %*
+start "Kuro" "%~dp0dist\Kuro-0.1.6\Kuro.exe" %*

@@ -4,7 +4,7 @@ OpenKuro is the source repository for Kuro, a native Windows video and motion ed
 
 ## Run
 
-After packaging locally, open `dist/Kuro-0.1.5/Kuro.exe`. The welcome screen lists recent projects and opens a blank timeline with New Project.
+After packaging locally, open `dist/Kuro-0.1.6/Kuro.exe`. The welcome screen lists recent projects and opens a blank timeline with New Project.
 
 From source:
 
@@ -65,7 +65,7 @@ True Motion reads selector values and keyframes from supported FFX presets in an
 
 The self-test generates real synthetic media, verifies timing/curves/transactions/persistence, and exports MP4s including a six-frame 4K composition. Results are in `artifacts/verification-report.json`. The short test is not a sustained performance benchmark. The full machine, checks, and visual review notes are in [docs/VERIFICATION.md](docs/VERIFICATION.md).
 
-`build.ps1` produces a framework-dependent Windows x64 build under `dist/Kuro-0.1.5` and a ZIP. It includes the sample project and copies optional preset files when available locally. FFmpeg is a separate runtime dependency.
+`build.ps1` produces a framework-dependent Windows x64 build under `dist/Kuro-0.1.6` and a ZIP. It includes the sample project and copies optional preset files when available locally. FFmpeg is a separate runtime dependency.
 
 ## License
 

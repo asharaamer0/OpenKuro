@@ -27,28 +27,31 @@ public partial class MainWindow
         appearance.Children.Add(Dialogs.Label("Cache", true)); appearance.Children.Add(Dialogs.Label(Store.Cache)); appearance.Children.Add(Dialogs.Button("Open cache folder", () => Process.Start(new ProcessStartInfo("explorer.exe", Store.Cache) { UseShellExecute = true })));
         appearance.Children.Add(Dialogs.Label("Cache eviction limits and proxy media are planned. Source media is never stored in the disposable cache."));
 
-        var keyboard = Tab("Shortcuts"); keyboard.Children.Add(Dialogs.Label("Keyboard shortcuts", true)); keyboard.Children.Add(Dialogs.Label("After Effects oriented defaults. Click a binding, press a shortcut, then Apply. Backspace clears it. Conflicts are rejected."));
+        var keyboard = Tab("Shortcuts"); keyboard.Children.Add(Dialogs.Label("Keyboard shortcuts", true)); keyboard.Children.Add(Dialogs.Label("Click a binding, press a shortcut, then Apply. Use Clear to remove a binding."));
         var search = Dialogs.Field(keyboard, "Search commands", ""); var rows = new StackPanel(); keyboard.Children.Add(rows);
         void RebuildShortcuts()
         {
             rows.Children.Clear(); foreach (var action in actions.Actions.Where(a => a.Name.Contains(search.Text, StringComparison.OrdinalIgnoreCase)))
             {
-                var grid = new Grid { Margin = new Thickness(0, 4, 0, 4) }; grid.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) }); grid.ColumnDefinitions.Add(new() { Width = new GridLength(155) }); grid.ColumnDefinitions.Add(new() { Width = new GridLength(64) });
-                var label = Dialogs.Label(action.Name); var binding = new TextBox { Text = actions.Binding(action), ToolTip = "Press a shortcut; Backspace clears it" };
+                var grid = new Grid { Margin = new Thickness(0, 4, 0, 4) }; grid.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) }); grid.ColumnDefinitions.Add(new() { Width = new GridLength(155) }); grid.ColumnDefinitions.Add(new() { Width = new GridLength(58) }); grid.ColumnDefinitions.Add(new() { Width = new GridLength(64) });
+                var label = Dialogs.Label(action.Name); var binding = new TextBox { Text = actions.Binding(action), ToolTip = "Press a shortcut" };
                 binding.PreviewKeyDown += (_, e) =>
                 {
                     e.Handled = true; var key = e.Key == System.Windows.Input.Key.System ? e.SystemKey : e.Key;
                     if (key is System.Windows.Input.Key.LeftCtrl or System.Windows.Input.Key.RightCtrl or System.Windows.Input.Key.LeftAlt or System.Windows.Input.Key.RightAlt or System.Windows.Input.Key.LeftShift or System.Windows.Input.Key.RightShift) return;
-                    if (key == System.Windows.Input.Key.Back) { binding.Text = ""; return; }
-                    var modifiers = System.Windows.Input.Keyboard.Modifiers; var prefix = (modifiers.HasFlag(System.Windows.Input.ModifierKeys.Control) ? "Ctrl+" : "") + (modifiers.HasFlag(System.Windows.Input.ModifierKeys.Alt) ? "Alt+" : "") + (modifiers.HasFlag(System.Windows.Input.ModifierKeys.Shift) ? "Shift+" : ""); binding.Text = prefix + key;
+                    var modifiers = System.Windows.Input.Keyboard.Modifiers; var prefix = (modifiers.HasFlag(System.Windows.Input.ModifierKeys.Control) ? "Ctrl+" : "") + (modifiers.HasFlag(System.Windows.Input.ModifierKeys.Alt) ? "Alt+" : "") + (modifiers.HasFlag(System.Windows.Input.ModifierKeys.Shift) ? "Shift+" : "");
+                    binding.Text = prefix + (key == System.Windows.Input.Key.Back ? "Backspace" : key.ToString());
                 };
+                var clear = Dialogs.Button("Clear", () => binding.Text = "");
+                clear.Margin = new Thickness(5, 0, 0, 0);
+                Grid.SetColumn(clear, 2); grid.Children.Add(clear);
                 var apply = Dialogs.Button("Apply", () =>
                 {
                     if (!ActionRegistry.Valid(binding.Text)) { MessageBox.Show(window, "That key combination is not supported by Windows gestures."); return; }
-                    var conflict = actions.Actions.FirstOrDefault(a => a.Id != action.Id && actions.Binding(a).Equals(binding.Text, StringComparison.OrdinalIgnoreCase) && binding.Text != "");
+                    var conflict = actions.Actions.FirstOrDefault(a => a.Id != action.Id && ActionRegistry.SameGesture(actions.Binding(a), binding.Text));
                     if (conflict != null) { MessageBox.Show(window, "Already assigned to " + conflict.Name + ". Clear that binding first."); return; }
                     Preferences.Current.Shortcuts[action.Id] = binding.Text; Preferences.Current.Save(); BuildMenu(); Toast("Shortcut updated · " + action.Name);
-                }); apply.Margin = new Thickness(5, 0, 0, 0); Grid.SetColumn(binding, 1); Grid.SetColumn(apply, 2); grid.Children.Add(label); grid.Children.Add(binding); grid.Children.Add(apply); rows.Children.Add(grid);
+                }); apply.Margin = new Thickness(5, 0, 0, 0); Grid.SetColumn(binding, 1); Grid.SetColumn(apply, 3); grid.Children.Add(label); grid.Children.Add(binding); grid.Children.Add(apply); rows.Children.Add(grid);
             }
         }
         search.TextChanged += (_, _) => RebuildShortcuts(); RebuildShortcuts();
@@ -57,7 +60,19 @@ public partial class MainWindow
         keyboard.Children.Add(Dialogs.Button("Import preset…", () =>
         {
             var open = new OpenFileDialog { Filter = "Shortcut preset|*.json" }; if (open.ShowDialog(window) != true) return;
-            try { var preset = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(open.FileName), Data.Json)!; if (preset.Any(p => !actions.Actions.Any(a => a.Id == p.Key) || !ActionRegistry.Valid(p.Value))) throw new InvalidDataException("The preset contains an unknown command or invalid shortcut."); var merged = actions.Actions.ToDictionary(a => a.Id, a => preset.GetValueOrDefault(a.Id, actions.Binding(a))); if (merged.Values.Where(v => v != "").GroupBy(v => v, StringComparer.OrdinalIgnoreCase).Any(g => g.Count() > 1)) throw new InvalidDataException("The preset contains conflicting bindings."); Preferences.Current.Shortcuts = merged; Preferences.Current.Save(); BuildMenu(); RebuildShortcuts(); } catch (Exception ex) { MessageBox.Show(window, ex.Message); }
+            try
+            {
+                var preset = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(open.FileName), Data.Json)!;
+                if (preset.Any(p => !actions.Actions.Any(a => a.Id == p.Key) || !ActionRegistry.Valid(p.Value)))
+                    throw new InvalidDataException("The preset contains an unknown command or invalid shortcut.");
+                var merged = actions.Actions.ToDictionary(a => a.Id, a => preset.GetValueOrDefault(a.Id, actions.Binding(a)));
+                var used = new HashSet<(System.Windows.Input.Key, System.Windows.Input.ModifierKeys)>();
+                foreach (var binding in merged.Values)
+                    if (ActionRegistry.Parse(binding, out var key, out var modifiers) && !used.Add((key, modifiers)))
+                        throw new InvalidDataException("The preset contains conflicting bindings.");
+                Preferences.Current.Shortcuts = merged; Preferences.Current.Save(); BuildMenu(); RebuildShortcuts();
+            }
+            catch (Exception ex) { MessageBox.Show(window, ex.Message); }
         }));
 
         var ai = Tab("AI connection"); ai.Children.Add(Dialogs.Label("Connected chat. Local tools.", true));

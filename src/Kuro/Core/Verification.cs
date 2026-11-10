@@ -65,6 +65,8 @@ public static class Verification
         Check(!File.ReadAllText(savePath).Contains("API_KEY"), "Project serialization excludes provider credentials");
         Check(ActionRegistry.Valid("Ctrl+Shift+D"), "Required split shortcut accepted"); Check(ActionRegistry.Valid("Ctrl+Alt+K"), "Custom shortcut syntax accepted");
         Check(ActionRegistry.Valid("P") && ActionRegistry.Valid("Space") && ActionRegistry.Valid("F9"), "Unmodified property/play/ease shortcuts accepted"); Check(ActionRegistry.Parse("Ctrl+0", out var fitKey, out _) && fitKey == System.Windows.Input.Key.D0, "Numeric shortcut maps to a physical digit key"); Check(!ActionRegistry.Valid("Ctrl+UnknownKey"), "Invalid shortcut rejected");
+        Check(ActionRegistry.Parse("Backspace", out var backspace, out var backspaceMods) && backspace == System.Windows.Input.Key.Back && backspaceMods == System.Windows.Input.ModifierKeys.None, "Backspace resolves to the Windows delete-selection key binding");
+        Check(ActionRegistry.SameGesture("Ctrl+Backspace", "Control+Back"), "Shortcut conflict checks recognize alternate Backspace spelling");
         // These checks exercise the optional third-party preset pack.
         var presets = Presets.Discover();
         if (presets.Count == 16)
@@ -173,6 +175,7 @@ public static class Verification
         var oldPreferences = Preferences.Current; Preferences.Current = new Preferences { LayoutVersion = 1 };
         await VerifyChatEdit();
         await VerifyChatFillPreview();
+        await VerifyPlaybackAcrossCut(source);
         double previewFramesPerSecond;
         using (var worker = new PreviewWorker())
         using (var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(8)))
@@ -306,6 +309,45 @@ public static class Verification
         var recovered = worker.Play(legacy, 0, 30, 1, timeout.Token);
         await recovered.Ready.WaitAsync(timeout.Token);
         Check(recovered.Take(0)?.Image != null, "Preview can render an in-memory layer with a legacy null fill");
+    }
+
+    static async Task VerifyPlaybackAcrossCut(Asset source)
+    {
+        var editor = new Editor();
+        editor.Comp.Width = source.Width;
+        editor.Comp.Height = source.Height;
+        editor.Comp.Duration = editor.Comp.WorkEnd = 60;
+        editor.Project.Assets.Add(source);
+        editor.Execute(new("add_asset", source.Id));
+        var bed = editor.Selected!;
+        bed.Kind = "Audio";
+        bed.Duration = 15;
+        editor.Execute(new("add_asset", source.Id));
+        editor.Selected!.SourceIn = .3;
+        editor.Selected.Duration = 42;
+        Check(editor.Execute(new("split_clip", Frame: 21)).Success, "Preview regression fixture uses a real video split");
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var path = Path.GetFullPath("artifacts/preview-cut.wav");
+        await Exporter.PreviewAudio(editor.Project, path, timeout.Token);
+        var mix = await Media.Probe(path, timeout.Token);
+        Near(mix.Duration, 2, "Preview audio spans the full composition across a cut and silent tail", .005);
+        var waveform = await Media.Waveform(mix, timeout.Token);
+        Check(waveform.Skip(75).Take(35).Any(peak => peak > .05) && waveform.Skip(145).All(peak => peak < .001),
+            "Preview mix contains post-cut clip audio and silence after the final clip");
+
+        using var worker = new PreviewWorker();
+        var playback = worker.Play(editor.Project, 16, 33, 1, timeout.Token);
+        await playback.Ready.WaitAsync(timeout.Token);
+        for (var frame = 16; frame < 33; frame++)
+        {
+            while (playback.Take(frame)?.Frame != frame)
+            {
+                if (playback.Error is { } error) throw new InvalidOperationException(error);
+                await Task.Delay(3, timeout.Token);
+            }
+        }
+        Check(true, "Buffered video preview delivers frames on both sides of the split");
     }
 
     static void VerifyPropertyReveals()

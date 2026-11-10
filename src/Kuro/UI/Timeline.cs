@@ -585,7 +585,7 @@ public sealed class Timeline : ScrollViewer
                     menu.Items.Add(action);
                 }
             }
-            menu.Items.Add(new Separator()); Item("Delete", "delete_layers", "Backspace", "Close"); Item("Ripple Delete", "ripple_delete", "Shift+Delete"); menu.PlacementTarget = this; menu.IsOpen = true; e.Handled = true;
+            menu.Items.Add(new Separator()); Item("Delete", "delete_layers", Preferences.Current.Shortcuts.GetValueOrDefault("layer.deleteBackspace", "Backspace"), "Close"); Item("Ripple Delete", "ripple_delete", "Shift+Delete"); menu.PlacementTarget = this; menu.IsOpen = true; e.Handled = true;
         }
         void Drag(object sender, DragEventArgs e)
         {

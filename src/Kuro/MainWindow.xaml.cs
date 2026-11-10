@@ -80,6 +80,13 @@ public partial class MainWindow : Window
         editor.Activity += Activity;
         preview.Ready += result => { if (!closed) Dispatcher.BeginInvoke(() => ShowFrame(result)); };
         clock.Tick += PlaybackTick; autosave.Tick += (_, _) => { if (editor.Dirty) SaveRecovery(); }; autosave.Start();
+        previewAudio.MediaEnded += (_, _) =>
+        {
+            if (!playing || !audioReady) return;
+            playbackStart = Math.Max(editor.Playhead, (long)Math.Floor(previewAudio.Position.TotalSeconds * editor.Comp.Fps.Value));
+            audioReady = false;
+            playback.Restart();
+        };
         RegisterActions(); BuildMenu(); Closing += OnClosing;
         Loaded += (_, _) => { NativeChrome.Match(this); Refresh(); timeline.Fit(); if (WelcomeScreen.IsVisible) AnimateWelcome(); };
         SystemEvents.UserPreferenceChanged += SystemPreferenceChanged;
@@ -99,8 +106,8 @@ public partial class MainWindow : Window
         actions.Add("edit.redo", "Redo", "Ctrl+Shift+Z", () => { Pause(); editor.Redo(); });
         actions.Add("layer.split", "Split selected layers at playhead", "Ctrl+Shift+D", Split);
         actions.Add("layer.duplicate", "Duplicate selected layers", "Ctrl+D", Duplicate);
-        actions.Add("layer.delete", "Delete selection", "Delete", DeleteSelection);
         actions.Add("layer.deleteBackspace", "Delete selection", "Backspace", DeleteSelection);
+        actions.Add("layer.delete", "Delete selection (alternate)", "Delete", DeleteSelection);
         actions.Add("layer.ripple", "Ripple delete selected layers", "Shift+Delete", () => Command("ripple_delete"));
         actions.Add("layer.precompose", "Precompose selected layers", "Ctrl+Shift+C", () => Command("precompose"));
         actions.Add("layer.text", "New text layer", "Ctrl+Alt+Shift+T", () => Command("create_text"));
@@ -134,7 +141,7 @@ public partial class MainWindow : Window
         void Item(MenuItem menu, string id) { var action = actions.Actions.First(a => a.Id == id); var item = new MenuItem { Header = action.Name, InputGestureText = actions.Binding(action) }; item.Click += (_, _) => action.Run(); menu.Items.Add(item); }
         var file = Menu("File"); foreach (var id in new[] { "project.new", "project.open", "project.save", "project.saveAs", "media.import", "render.export" }) Item(file, id);
         var recent = new MenuItem { Header = "Recent projects" }; foreach (var path in Preferences.Current.Recent.Where(File.Exists).Take(8)) { var item = new MenuItem { Header = Path.GetFileNameWithoutExtension(path), ToolTip = path }; item.Click += (_, _) => { if (CanDiscard()) LoadProject(path); }; recent.Items.Add(item); } file.Items.Add(recent);
-        var edit = Menu("Edit"); foreach (var id in new[] { "edit.undo", "edit.redo", "layer.split", "layer.duplicate", "layer.delete", "layer.ripple", "layer.precompose" }) Item(edit, id);
+        var edit = Menu("Edit"); foreach (var id in new[] { "edit.undo", "edit.redo", "layer.split", "layer.duplicate", "layer.deleteBackspace", "layer.ripple", "layer.precompose" }) Item(edit, id);
         var comp = Menu("Composition"); Item(comp, "composition.settings"); comp.Items.Add(new Separator()); Item(comp, "layer.text"); Item(comp, "layer.shape");
         var view = Menu("View"); Item(view, "timeline.graph"); Item(view, "timeline.fit"); var reset = new MenuItem { Header = "Reset workspace" }; reset.Click += (_, _) => { ProjectColumn.Width = new GridLength(264); InspectorColumn.Width = new GridLength(290); TimelineRow.Height = new GridLength(300); }; view.Items.Add(reset);
         foreach (var theme in new[] { "Light", "Dark", "Follow Windows" }) { var item = new MenuItem { Header = theme + " appearance" }; item.Click += (_, _) => SetTheme(theme); view.Items.Add(item); }
@@ -245,10 +252,10 @@ public partial class MainWindow : Window
             if (playbackSnapshot.Assets.Any(a => a.HasAudio))
             {
                 Status.Text = "Preparing local audio preview…";
-                var output = Path.Combine(Store.Cache, $"{playbackSnapshot.Id}-{playbackSnapshot.Active.Id}-{playbackSnapshot.Revision}-preview.wav");
+                var output = Path.Combine(Store.Cache, $"{playbackSnapshot.Id}-{playbackSnapshot.Active.Id}-{playbackSnapshot.Revision}-preview-v2.wav");
                 if (!File.Exists(output))
                 {
-                    var partial = output + ".partial.wav";
+                    var partial = output + "." + Data.Id() + ".partial.wav";
                     try { await Exporter.PreviewAudio(playbackSnapshot, partial, cancel.Token); cancel.Token.ThrowIfCancellationRequested(); File.Move(partial, output, true); }
                     finally { if (File.Exists(partial)) File.Delete(partial); }
                 }

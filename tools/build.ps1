@@ -1,4 +1,4 @@
-param([ValidatePattern('^Kuro(?:-[0-9]+(?:\.[0-9]+)*)?$')][string]$PackageName = 'Kuro-0.1.5')
+param([ValidatePattern('^Kuro(?:-[0-9]+(?:\.[0-9]+)*)?$')][string]$PackageName = 'Kuro-0.1.6')
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath (Split-Path -Parent $PSScriptRoot)
 $outputDirectory = Join-Path 'dist' $PackageName

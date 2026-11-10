@@ -73,7 +73,9 @@ public static class Exporter
         Collect(c, -c.Fps.Seconds(start), 0, c.Fps.Seconds(end), 0);
         if (labels.Count > 0)
         {
-            filters.Add(string.Concat(labels) + $"amix=inputs={labels.Count}:duration=longest:normalize=0,apad,atrim=duration={Processes.Number(duration)}[mix]");
+            // A finite silent first input gives the mix a clock independent of clip order and cuts.
+            args.AddRange(["-f", "lavfi", "-i", $"anullsrc=r=48000:cl=stereo:d={Processes.Number(duration)}"]);
+            filters.Add($"[{input}:a]" + string.Concat(labels) + $"amix=inputs={labels.Count + 1}:duration=first:normalize=0[mix]");
             args.AddRange(["-filter_complex", string.Join(';', filters)]); if (video != null) args.AddRange(["-map", "0:v:0"]); args.AddRange(["-map", "[mix]", "-c:a", video == null ? "pcm_s16le" : "aac", "-ar", "48000"]); if (video != null) args.AddRange(["-b:a", $"{bitrate}k"]);
         }
         else if (video != null) args.AddRange(["-map", "0:v:0", "-an"]);

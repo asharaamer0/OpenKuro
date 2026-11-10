@@ -20,6 +20,9 @@ public sealed class ActionRegistry
         return false;
     }
     public static bool Valid(string shortcut) => shortcut == "" || Parse(shortcut, out _, out _);
+    public static bool SameGesture(string left, string right) =>
+        Parse(left, out var leftKey, out var leftModifiers) && Parse(right, out var rightKey, out var rightModifiers)
+        && leftKey == rightKey && leftModifiers == rightModifiers;
     public static bool Parse(string shortcut, out Key key, out ModifierKeys modifiers)
     {
         key = Key.None; modifiers = ModifierKeys.None; var parts = shortcut.Split('+', StringSplitOptions.TrimEntries);
@@ -29,7 +32,9 @@ public sealed class ActionRegistry
             var modifier = parts[i].ToLowerInvariant() switch { "ctrl" or "control" => ModifierKeys.Control, "alt" => ModifierKeys.Alt, "shift" => ModifierKeys.Shift, _ => ModifierKeys.None };
             if (modifier == ModifierKeys.None || modifiers.HasFlag(modifier)) return false; modifiers |= modifier;
         }
-        var final = parts[^1]; if (final.Length == 1 && char.IsDigit(final[0])) final = "D" + final;
+        var final = parts[^1];
+        if (final.Equals("Backspace", StringComparison.OrdinalIgnoreCase)) final = nameof(Key.Back);
+        if (final.Length == 1 && char.IsDigit(final[0])) final = "D" + final;
         return Enum.TryParse(final, true, out key) && key != Key.None && !final.All(char.IsDigit);
     }
 }
