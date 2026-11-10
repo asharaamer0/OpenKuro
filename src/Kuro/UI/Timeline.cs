@@ -17,7 +17,7 @@ public sealed class Timeline : ScrollViewer
     public bool Snap { get; set; } = true;
     public HashSet<string> Expanded { get; } = [];
     public string Property { get; set; } = "x";
-    public event Action<long>? Seek;
+    public event Action<long, bool>? Seek;
     public event Action? SelectionUpdated;
     public event Action<string>? GraphRequested;
     public event Action<string, string, double>? PropertyPreview;
@@ -100,6 +100,12 @@ public sealed class Timeline : ScrollViewer
             };
             LostMouseCapture += (_, _) =>
             {
+                if (dragMode == "scrub")
+                {
+                    dragMode = "";
+                    owner.Seek?.Invoke(E.Playhead, false);
+                    return;
+                }
                 if (valueScrub == null) return;
                 var moved = valueScrub.HasMoved;
                 valueScrub = null; dragLayer = null; dragMode = "";
@@ -413,7 +419,7 @@ public sealed class Timeline : ScrollViewer
         void Down(object sender, MouseButtonEventArgs e)
         {
             Focus(); var p = e.GetPosition(this); down = p; dragLayer = null; dragKey = null; dragProperty = null;
-            if (p.Y < Ruler + owner.VerticalOffset && p.X > Header + owner.HorizontalOffset) { dragMode = "scrub"; owner.Seek?.Invoke(Frame(p.X)); CaptureMouse(); return; }
+            if (p.Y < Ruler + owner.VerticalOffset && p.X > Header + owner.HorizontalOffset) { dragMode = "scrub"; owner.Seek?.Invoke(Frame(p.X), true); CaptureMouse(); return; }
             var row = RowAt(p.Y);
             if (row.Layer == null) { E.Select(null); owner.SelectionUpdated?.Invoke(); return; }
             var l = row.Layer; var localX = p.X - owner.HorizontalOffset;
@@ -465,7 +471,7 @@ public sealed class Timeline : ScrollViewer
                 else { dragMode = "marquee"; marqueeBase = Keyboard.Modifiers.HasFlag(ModifierKeys.Control) ? E.SelectedKeys.ToHashSet() : []; marquee = new Rect(p, p); CaptureMouse(); }
                 owner.SelectionUpdated?.Invoke(); return;
             }
-            if (p.X < X(l.Start) - 5 || p.X > X(l.End) + 5) { dragMode = "scrub"; owner.Seek?.Invoke(Frame(p.X)); CaptureMouse(); return; }
+            if (p.X < X(l.Start) - 5 || p.X > X(l.End) + 5) { dragMode = "scrub"; owner.Seek?.Invoke(Frame(p.X), true); CaptureMouse(); return; }
             if (!E.Selection.Contains(l.Id)) E.Select(l.Id, Keyboard.Modifiers.HasFlag(ModifierKeys.Control));
             owner.SelectionUpdated?.Invoke(); if (l.Locked) return;
             dragLayer = l; dragMode = Math.Abs(p.X - X(l.Start)) < 8 ? "start" : Math.Abs(p.X - X(l.End)) < 8 ? "end" : "move";
@@ -485,7 +491,7 @@ public sealed class Timeline : ScrollViewer
                 Cursor = value ? Cursors.SizeAll : x >= Header && p.Y < owner.VerticalOffset + Ruler ? Cursors.IBeam : Cursors.Arrow;
                 return;
             }
-            if (dragMode == "scrub") { owner.Seek?.Invoke(Frame(p.X)); return; }
+            if (dragMode == "scrub") { owner.Seek?.Invoke(Frame(p.X), true); return; }
             if (valueScrub != null && dragLayer != null && dragProperty != null)
             {
                 if (valueScrub.Update(p)) { owner.PropertyPreview?.Invoke(dragLayer.Id, dragProperty, valueScrub.Value); Refresh(); }
@@ -511,6 +517,13 @@ public sealed class Timeline : ScrollViewer
         }
         void Up(object sender, MouseButtonEventArgs e)
         {
+            if (dragMode == "scrub")
+            {
+                dragMode = "";
+                ReleaseMouseCapture();
+                owner.Seek?.Invoke(Frame(e.GetPosition(this).X), false);
+                return;
+            }
             if (valueScrub is { } scrub && dragLayer is { } layer && dragProperty is { } property)
             {
                 valueScrub = null; dragLayer = null; dragMode = "";

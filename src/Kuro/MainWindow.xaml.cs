@@ -35,6 +35,8 @@ public class AssetItem : INotifyPropertyChanged
 public partial class MainWindow : Window
 {
     readonly Editor editor = new(); readonly PreviewWorker preview = new(); readonly ActionRegistry actions = new();
+    Project? scrubSnapshot;
+    long previewRequest, scrubFirstRequest;
     readonly Timeline timeline; readonly GraphEditor graph; readonly DispatcherTimer clock = new() { Interval = TimeSpan.FromMilliseconds(16) }, autosave = new() { Interval = TimeSpan.FromSeconds(30) };
     readonly Stopwatch playback = new(); long playbackStart; long displayedFrame = -1;
     PlaybackBuffer? playbackFrames;
@@ -179,24 +181,41 @@ public partial class MainWindow : Window
     void SearchAssets(object sender, TextChangedEventArgs e) { if (timeline != null) UpdateAssets(); }
     void UpdateTime()
     { TimelineTime.Text = editor.Comp.Fps.Timecode(editor.Playhead); if (!ViewerTime.IsKeyboardFocused) ViewerTime.Text = TimelineTime.Text; timeline.CursorOnly(); if (graphOpen) graph.Refresh(); }
-    void RequestPreview(bool interrupt = true)
+    void RequestPreview()
     {
+        scrubSnapshot = null;
         if (closed) return; FrameNotice.Visibility = Visibility.Visible; FrameNoticeText.Text = "Rendering " + editor.Comp.Fps.Timecode(editor.Playhead);
         var draft = Data.Clone(editor.Project);
         if (draft.Active.Layers.Find(layer => layer.Id == inlineLayerId) is { } editing) editing.Visible = false;
-        preview.Request(draft, editor.Playhead, Preferences.Current.PreviewDivisor, interrupt);
+        previewRequest = preview.Request(draft, editor.Playhead, Preferences.Current.PreviewDivisor, hardware: Preferences.Current.HardwarePreview);
     }
     void ShowFrame(FrameResult result)
     {
-        if (playing || result.Frame != editor.Playhead) return;
-        if (result.Error != null) { FrameNoticeText.Text = result.Error; FrameNotice.Visibility = Visibility.Visible; PreviewImage.Source = null; Status.Text = result.Error; if (playing) Pause(); return; }
+        if (playing || (scrubSnapshot == null ? result.Request != previewRequest : result.Request < scrubFirstRequest)) return;
+        if (result.Error != null)
+        {
+            if (scrubSnapshot != null) return;
+            FrameNoticeText.Text = result.Error; FrameNotice.Visibility = Visibility.Visible; Status.Text = result.Error; return;
+        }
         displayedFrame = result.Frame; PreviewImage.Source = result.Image; FrameNotice.Visibility = Visibility.Collapsed;
-        UpdateOverlay();
+        if (scrubSnapshot == null) UpdateOverlay();
     }
-    public void Seek(long frame)
+    public void Seek(long frame, bool scrubbing = false)
     {
-        Pause(); editor.Playhead = Math.Clamp(frame, 0, editor.Comp.Duration - 1);
+        if (playing) Pause();
+        frame = Math.Clamp(frame, 0, editor.Comp.Duration - 1);
+        if (scrubbing && scrubSnapshot != null && editor.Playhead == frame) return;
+        editor.Playhead = frame;
         UpdateTime();
+        if (scrubbing)
+        {
+            var start = scrubSnapshot == null;
+            scrubSnapshot ??= Data.Clone(editor.Project);
+            previewRequest = preview.Request(scrubSnapshot, frame, Math.Max(4, Preferences.Current.PreviewDivisor),
+                interrupt: start, scrubbing: true, hardware: Preferences.Current.HardwarePreview);
+            if (start) scrubFirstRequest = previewRequest;
+            return;
+        }
         if (timeline.Expanded.Count > 0) timeline.Refresh();
         foreach (var refreshField in refreshPropertyFields) refreshField();
         RequestPreview(); UpdateOverlay();
@@ -244,7 +263,7 @@ public partial class MainWindow : Window
         ViewerOverlay.Visibility = Visibility.Hidden;
         var cancel = new CancellationTokenSource();
         playbackCancellation = audioPreparation = cancel;
-        var buffer = preview.Play(playbackSnapshot, playbackStart, editor.Comp.WorkEnd, Preferences.Current.PreviewDivisor, cancel.Token);
+        var buffer = preview.Play(playbackSnapshot, playbackStart, editor.Comp.WorkEnd, Preferences.Current.PreviewDivisor, cancel.Token, Preferences.Current.HardwarePreview);
         playbackFrames = buffer;
         Status.Text = "Buffering preview…";
         try
@@ -252,7 +271,7 @@ public partial class MainWindow : Window
             if (playbackSnapshot.Assets.Any(a => a.HasAudio))
             {
                 Status.Text = "Preparing local audio preview…";
-                var output = Path.Combine(Store.Cache, $"{playbackSnapshot.Id}-{playbackSnapshot.Active.Id}-{playbackSnapshot.Revision}-preview-v2.wav");
+                var output = Path.Combine(Store.Cache, $"{playbackSnapshot.Id}-{playbackSnapshot.Active.Id}-{playbackSnapshot.Revision}-preview-v3.wav");
                 if (!File.Exists(output))
                 {
                     var partial = output + "." + Data.Id() + ".partial.wav";
@@ -346,7 +365,7 @@ public partial class MainWindow : Window
         var layer = draft.Active.Layers.Find(l => l.Id == layerId);
         if (layer == null || !layer.Properties.ContainsKey(property)) return;
         Editor.SetLayerValue(layer, property, editor.Playhead, value, linkAxes: true);
-        preview.Request(draft, editor.Playhead, Preferences.Current.PreviewDivisor);
+        previewRequest = preview.Request(draft, editor.Playhead, Preferences.Current.PreviewDivisor, hardware: Preferences.Current.HardwarePreview);
     }
     void EasyEase() => EaseKeys("Easy Ease");
     void EaseKeys(string type) { if (editor.KeyTargets.Any()) editor.Execute(new("set_selected_interpolation", Text: type)); }
@@ -435,6 +454,7 @@ public partial class MainWindow : Window
             rate.LostKeyboardFocus += (_, _) => { if (!uiBuilding && double.TryParse(rate.Text, CultureInfo.InvariantCulture, out var value) && value != l.Rate) { var r = editor.Execute(new("set_rate", l.Id, Value: value)); if (!r.Success) Toast(r.Summary); } };
             var source = Dialogs.Field(inspectorTarget, "Source in · seconds", l.SourceIn.ToString("0.###", CultureInfo.InvariantCulture)); source.IsEnabled = !l.Locked; source.LostKeyboardFocus += (_, _) => { if (!uiBuilding && double.TryParse(source.Text, CultureInfo.InvariantCulture, out var value) && value != l.SourceIn) editor.Execute(new("set_source_in", l.Id, Value: value)); };
             var audio = new CheckBox { Content = "Enable source audio in export", IsChecked = l.Audio, IsEnabled = !l.Locked }; audio.Click += (_, _) => editor.Execute(new("toggle_audio", l.Id)); inspectorTarget.Children.Add(audio);
+            AddClipVolume(inspectorTarget);
             if (l.Kind == "Video")
             {
                 Section("Local tools");
@@ -444,6 +464,33 @@ public partial class MainWindow : Window
             }
         }
         finally { uiBuilding = oldBuilding; }
+    }
+    void AddClipVolume(StackPanel panel)
+    {
+        var selected = editor.Comp.Layers.Where(layer => editor.Selection.Contains(layer.Id) &&
+            (layer.Kind is "Audio" or "Composition" || editor.Project.Assets.Any(asset => asset.Id == layer.AssetId && asset.HasAudio))).ToArray();
+        if (selected.Length == 0) return;
+        var targets = selected.Where(layer => !layer.Locked).ToArray();
+        var initial = (targets.FirstOrDefault() ?? selected[0]).Volume * 100;
+        var slider = new Slider { Minimum = 0, Maximum = Math.Max(200, initial), Value = Math.Max(0, initial), TickFrequency = 1,
+            SmallChange = 1, LargeChange = 10, IsEnabled = targets.Length > 0, ToolTip = "Adjust volume for selected audio clips" };
+        System.Windows.Automation.AutomationProperties.SetName(slider, "Clip volume");
+        var row = new DockPanel { Margin = new Thickness(0, 8, 0, 0) };
+        var label = Dialogs.Label("Volume");
+        var readout = Dialogs.Label($"{slider.Value:0}%");
+        DockPanel.SetDock(readout, Dock.Right);
+        row.Children.Add(readout); row.Children.Add(label);
+        panel.Children.Add(row); panel.Children.Add(slider);
+        slider.ValueChanged += (_, _) => readout.Text = $"{slider.Value:0}%";
+        void Commit()
+        {
+            var gain = Math.Round(slider.Value) / 100;
+            if (Math.Abs(gain * 100 - initial) < .01 || targets.Length == 0) return;
+            initial = gain * 100;
+            editor.Transaction("Set clip volume", () => { foreach (var target in targets) target.Volume = gain; });
+        }
+        slider.PreviewMouseLeftButtonUp += (_, _) => Commit();
+        slider.KeyUp += (_, _) => Commit();
     }
     void Numeric(Layer l, string label, string property, string unit)
     {
@@ -670,7 +717,7 @@ public partial class MainWindow : Window
         var scale = ImageRect().Width / editor.Comp.Width; if (scale <= 0) return;
         var draft = Data.Clone(editor.Project); var layer = draft.Active.Layers.FirstOrDefault(l => l.Id == viewerLayer); if (layer == null) return;
         foreach (var (key, value) in new[] { ("x", originalX + delta.X / scale), ("y", originalY + delta.Y / scale) }) { var curve = layer.Properties[key]; if (curve.Keys.Count > 0) curve.Set(editor.Playhead, value); else curve.Value = value; }
-        preview.Request(draft, editor.Playhead, Preferences.Current.PreviewDivisor);
+        previewRequest = preview.Request(draft, editor.Playhead, Preferences.Current.PreviewDivisor, hardware: Preferences.Current.HardwarePreview);
     }
     void ViewerMouseUp(object sender, MouseButtonEventArgs e)
     {
@@ -786,7 +833,7 @@ public partial class MainWindow : Window
     void WindowDrop(object sender, DragEventArgs e)
     {
         if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return; var files = (string[])e.Data.GetData(DataFormats.FileDrop);
-        if (files.Length == 1 && Path.GetExtension(files[0]).Equals(".kuro", StringComparison.OrdinalIgnoreCase)) { if (CanDiscard()) LoadProject(files[0]); }
+        if (files.Length == 1 && Store.IsProjectPath(files[0])) { if (CanDiscard()) LoadProject(files[0]); }
         else ImportMedia(files); e.Handled = true;
     }
     void AssetMouseDown(object sender, MouseButtonEventArgs e) => assetDown = e.GetPosition(AssetList);
@@ -819,7 +866,7 @@ public partial class MainWindow : Window
     async void Relink(Asset asset)
     {
         var picker = new OpenFileDialog { Title = "Relink " + asset.Name }; if (picker.ShowDialog(this) != true) return;
-        try { var replacement = await Media.Probe(picker.FileName); if (replacement.Kind != asset.Kind) throw new InvalidOperationException("Choose media of the same type."); editor.Transaction("Relink media", () => { asset.Path = replacement.Path; asset.Width = replacement.Width; asset.Height = replacement.Height; asset.Duration = replacement.Duration; asset.FrameRate = replacement.FrameRate; asset.HasAudio = replacement.HasAudio; asset.HasAlpha = replacement.HasAlpha; }); _ = AnalyzeAsset(asset, editor.Project.Id); } catch (Exception ex) { Toast(ex.Message); }
+        try { var replacement = await Media.Probe(picker.FileName); if (replacement.Kind != asset.Kind) throw new InvalidOperationException("Choose media of the same type."); editor.Transaction("Relink media", () => { asset.Path = replacement.Path; asset.Width = replacement.Width; asset.Height = replacement.Height; asset.Duration = replacement.Duration; asset.FrameRate = replacement.FrameRate; asset.VideoDuration = replacement.VideoDuration; asset.HasAudio = replacement.HasAudio; asset.HasAlpha = replacement.HasAlpha; }); _ = AnalyzeAsset(asset, editor.Project.Id); } catch (Exception ex) { Toast(ex.Message); }
     }
     bool CanDiscard()
     {
@@ -838,7 +885,7 @@ public partial class MainWindow : Window
         timeline.Fit();
         Status.Text = "Ready";
     }
-    void OpenProject() { if (!CanDiscard()) return; var dialog = new OpenFileDialog { Filter = "Kuro project|*.kuro", Title = "Open project" }; if (dialog.ShowDialog(this) == true) LoadProject(dialog.FileName); }
+    void OpenProject() { if (!CanDiscard()) return; var dialog = new OpenFileDialog { Filter = Store.ProjectFilter, Title = "Open project" }; if (dialog.ShowDialog(this) == true) LoadProject(dialog.FileName); }
     public bool LoadProject(string path, bool recovering = false)
     {
         try
@@ -864,7 +911,14 @@ public partial class MainWindow : Window
     bool SaveProject(bool saveAs = false)
     {
         var path = projectPath;
-        if (path == null || saveAs) { var dialog = new SaveFileDialog { Title = "Save Kuro project", Filter = "Kuro project|*.kuro", DefaultExt = ".kuro", FileName = editor.Project.Name == "Untitled" ? "Untitled.kuro" : editor.Project.Name + ".kuro" }; if (dialog.ShowDialog(this) != true) return false; path = dialog.FileName; }
+        if (path == null || saveAs || !Path.GetExtension(path).Equals(Store.ProjectExtension, StringComparison.OrdinalIgnoreCase))
+        {
+            var dialog = new SaveFileDialog { Title = "Save Kuro project", Filter = "Kuro project (*.kr)|*.kr", DefaultExt = Store.ProjectExtension, FileName = editor.Project.Name + Store.ProjectExtension };
+            if (dialog.ShowDialog(this) != true) return false;
+            path = Path.ChangeExtension(dialog.FileName, Store.ProjectExtension);
+            if (!path.Equals(dialog.FileName, StringComparison.OrdinalIgnoreCase) && File.Exists(path) &&
+                MessageBox.Show(this, $"Replace {Path.GetFileName(path)}?", "Save project", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return false;
+        }
         try { editor.Project.Name = Path.GetFileNameWithoutExtension(path); Store.Save(editor.Project, path); projectPath = path; editor.Dirty = false; Remember(path); Refresh(); Status.Text = "Saved · " + Path.GetFileName(path); return true; }
         catch (Exception ex) { Toast("Could not save project: " + ex.Message); return false; }
     }

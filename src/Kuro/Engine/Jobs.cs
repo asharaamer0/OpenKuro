@@ -27,61 +27,94 @@ public static class Exporter
         var estimate = c.Fps.Seconds(end - start) * (o.Width >= 3840 ? 8_000_000 : 3_000_000);
         var drive = new DriveInfo(Path.GetPathRoot(folder)!); if (drive.IsReady && drive.AvailableFreeSpace < estimate + 100_000_000) throw new IOException("The destination needs more free space for the export and temporary files.");
         var partial = Path.Combine(folder, Path.GetFileNameWithoutExtension(o.Path) + "." + Data.Id()[..8] + ".partial.mp4");
-        var silent = Path.Combine(folder, Path.GetFileNameWithoutExtension(partial) + ".video.mp4");
-        var watch = Stopwatch.StartNew(); using var renderer = new Renderer();
+        var watch = Stopwatch.StartNew();
+        using var renderer = new Renderer();
         try
         {
-            using (var process = Processes.Start("ffmpeg", ["-v", "error", "-y", "-f", "rawvideo", "-pixel_format", "bgra", "-video_size", $"{o.Width}x{o.Height}", "-framerate", $"{c.Fps.Numerator}/{c.Fps.Denominator}", "-i", "pipe:0", "-an", "-c:v", "libx264", "-preset", "fast", "-crf", o.Crf.ToString(), "-pix_fmt", "yuv420p", "-vf", "scale=out_color_matrix=bt709:out_range=tv,setsar=1", "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709", "-movflags", "+faststart", silent], true))
+            var args = new List<string> { "-v", "error", "-y", "-f", "rawvideo", "-pixel_format", "bgra",
+                "-video_size", $"{o.Width}x{o.Height}", "-framerate", $"{c.Fps.Numerator}/{c.Fps.Denominator}", "-i", "pipe:0" };
+            AddAudio(project, c, args, start, end, o.AudioKbps, video: true);
+            args.AddRange(["-c:v", "libx264", "-preset", "veryfast", "-crf", o.Crf.ToString(), "-pix_fmt", "yuv420p",
+                "-vf", "scale=out_color_matrix=bt709:out_range=tv,setsar=1", "-color_primaries", "bt709",
+                "-color_trc", "bt709", "-colorspace", "bt709", "-movflags", "+faststart", partial]);
+            using var process = Processes.Start("ffmpeg", args, true);
+            using var cancel = token.Register(() => Processes.Kill(process));
+            var errors = process.StandardError.ReadToEndAsync();
+            try
             {
-                using var cancel = token.Register(() => Processes.Kill(process)); var errors = process.StandardError.ReadToEndAsync();
                 var data = new byte[checked(o.Width * o.Height * 4)];
                 for (var frame = start; frame < end; frame++)
                 {
-                    token.ThrowIfCancellationRequested(); var bitmap = renderer.Render(project, c, frame, o.Width, o.Height, token); bitmap.CopyPixels(data, o.Width * 4, 0);
-                    process.StandardInput.BaseStream.Write(data); progress?.Report(new("Rendering", (double)(frame - start + 1) / (end - start) * .94, frame - start + 1, end - start, watch.Elapsed));
+                    token.ThrowIfCancellationRequested();
+                    var bitmap = renderer.Render(project, c, frame, o.Width, o.Height, token);
+                    bitmap.CopyPixels(data, o.Width * 4, 0);
+                    process.StandardInput.BaseStream.Write(data);
+                    progress?.Report(new("Rendering", (double)(frame - start + 1) / (end - start) * .97, frame - start + 1, end - start, watch.Elapsed));
                 }
-                process.StandardInput.Close(); process.WaitForExit(); token.ThrowIfCancellationRequested(); if (process.ExitCode != 0) throw new IOException("Video encoding failed: " + errors.GetAwaiter().GetResult());
+                process.StandardInput.Close();
+                progress?.Report(new("Finalizing MP4", .99, end - start, end - start, watch.Elapsed));
+                process.WaitForExit();
+                token.ThrowIfCancellationRequested();
+                if (process.ExitCode != 0) throw new IOException("Export failed: " + errors.GetAwaiter().GetResult());
             }
-            progress?.Report(new("Mixing audio", .95, end - start, end - start, watch.Elapsed));
-            MixAudio(project, c, silent, partial, start, end, o.AudioKbps, token);
-            token.ThrowIfCancellationRequested(); File.Move(partial, o.Path, true); progress?.Report(new("Complete", 1, end - start, end - start, watch.Elapsed));
+            catch (IOException) when (token.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(token);
+            }
+            finally { Processes.Kill(process); }
+            File.Move(partial, o.Path, true);
+            progress?.Report(new("Complete", 1, end - start, end - start, watch.Elapsed));
         }
-        finally { if (File.Exists(silent)) File.Delete(silent); if (File.Exists(partial)) File.Delete(partial); }
+        finally { if (File.Exists(partial)) File.Delete(partial); }
     }
-    // Recurses precompositions and keeps source audio in the same frame-based time domain.
-    public static Task PreviewAudio(Project p, string output, CancellationToken token) => Task.Run(() => MixAudio(p, p.Active, null, output, 0, p.Active.Duration, 320, token), token);
-    static void MixAudio(Project p, Composition c, string? video, string output, long start, long end, int bitrate, CancellationToken token)
+
+    public static Task PreviewAudio(Project p, string output, CancellationToken token)
     {
-        var args = new List<string> { "-v", "error", "-y" }; if (video != null) args.AddRange(["-i", video]); var filters = new List<string>(); var labels = new List<string>(); var duration = c.Fps.Seconds(end - start); int input = video == null ? 0 : 1;
-        void Collect(Composition comp, double offset, double sourceOffset, double window, int depth)
+        var args = new List<string> { "-v", "error", "-y" };
+        AddAudio(p, p.Active, args, 0, p.Active.Duration, 320, video: false);
+        args.Add(output);
+        return Processes.Run("ffmpeg", args, token);
+    }
+
+    // Recurses precompositions and keeps audio in the same frame-based time domain as video.
+    static void AddAudio(Project p, Composition c, List<string> args, long start, long end, int bitrate, bool video)
+    {
+        var filters = new List<string>();
+        var labels = new List<string>();
+        var duration = c.Fps.Seconds(end - start);
+        int input = video ? 1 : 0;
+        void Collect(Composition comp, double offset, double sourceOffset, double window, double gain, int depth)
         {
             if (depth > 12) return; var solo = comp.Layers.Any(l => l.Solo);
             foreach (var l in comp.Layers.Where(l => l.Audio && (!solo || l.Solo)))
             {
                 var begin = offset + comp.Fps.Seconds(l.Start) - sourceOffset; var length = comp.Fps.Seconds(l.Duration); var overlapStart = Math.Max(0, begin); var overlapEnd = Math.Min(duration, Math.Min(window + offset, begin + length));
                 if (overlapEnd <= overlapStart) continue;
-                if (l.Kind == "Composition") { var nested = p.Compositions.Find(x => x.Id == l.CompositionId); if (nested != null && l.Rate == 1) Collect(nested, begin, l.SourceIn, length, depth + 1); continue; }
+                if (l.Kind == "Composition") { var nested = p.Compositions.Find(x => x.Id == l.CompositionId); if (nested != null && l.Rate == 1) Collect(nested, begin, l.SourceIn, length, gain * l.Volume, depth + 1); continue; }
                 var asset = p.Assets.Find(a => a.Id == l.AssetId); if (asset == null || !asset.HasAudio || asset.Missing || l.Rate == 0 || l.Properties.ContainsKey("time")) continue;
-                args.AddRange(["-protocol_whitelist", "file,pipe", "-i", asset.Path]); var speed = Math.Abs(l.Rate); var src = l.SourceIn + (overlapStart - begin) * l.Rate; var len = (overlapEnd - overlapStart) * speed;
-                var chain = $"[{input}:a]atrim=start={Processes.Number(l.Rate > 0 ? src : Math.Max(0, src - len))}:duration={Processes.Number(len)},asetpts=PTS-STARTPTS";
+                var speed = Math.Abs(l.Rate); var src = l.SourceIn + (overlapStart - begin) * l.Rate; var len = (overlapEnd - overlapStart) * speed;
+                var sourceStart = Math.Max(0, l.Rate > 0 ? src : src - len);
+                args.AddRange(["-ss", Processes.Number(sourceStart), "-protocol_whitelist", "file,pipe", "-i", asset.Path]);
+                var chain = $"[{input}:a]atrim=duration={Processes.Number(len)},asetpts=PTS-STARTPTS";
                 if (l.Rate < 0) chain += ",areverse";
                 while (speed > 2) { chain += ",atempo=2"; speed /= 2; } while (speed < .5) { chain += ",atempo=0.5"; speed *= 2; }
-                chain += $",atempo={Processes.Number(speed)},volume={Processes.Number(l.Volume)},aresample=48000,aformat=channel_layouts=stereo,adelay={Math.Round(overlapStart * 1000)}:all=1[a{input}]";
+                if (speed != 1) chain += $",atempo={Processes.Number(speed)}";
+                chain += $",volume={Processes.Number(gain * l.Volume)},aresample=48000,aformat=channel_layouts=stereo,adelay={Math.Round(overlapStart * 48000)}S:all=1[a{input}]";
                 filters.Add(chain); labels.Add($"[a{input}]"); input++;
             }
         }
-        Collect(c, -c.Fps.Seconds(start), 0, c.Fps.Seconds(end), 0);
+        Collect(c, -c.Fps.Seconds(start), 0, c.Fps.Seconds(end), 1, 0);
         if (labels.Count > 0)
         {
             // A finite silent first input gives the mix a clock independent of clip order and cuts.
             args.AddRange(["-f", "lavfi", "-i", $"anullsrc=r=48000:cl=stereo:d={Processes.Number(duration)}"]);
             filters.Add($"[{input}:a]" + string.Concat(labels) + $"amix=inputs={labels.Count + 1}:duration=first:normalize=0[mix]");
-            args.AddRange(["-filter_complex", string.Join(';', filters)]); if (video != null) args.AddRange(["-map", "0:v:0"]); args.AddRange(["-map", "[mix]", "-c:a", video == null ? "pcm_s16le" : "aac", "-ar", "48000"]); if (video != null) args.AddRange(["-b:a", $"{bitrate}k"]);
+            args.AddRange(["-filter_complex", string.Join(';', filters)]); if (video) args.AddRange(["-map", "0:v:0"]); args.AddRange(["-map", "[mix]", "-c:a", video ? "aac" : "pcm_s16le", "-ar", "48000"]); if (video) args.AddRange(["-b:a", $"{bitrate}k"]);
         }
-        else if (video != null) args.AddRange(["-map", "0:v:0", "-an"]);
+        else if (video) args.AddRange(["-map", "0:v:0", "-an"]);
         else args.AddRange(["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-c:a", "pcm_s16le"]);
-        if (video != null) args.AddRange(["-c:v", "copy", "-movflags", "+faststart"]);
-        args.AddRange(["-t", Processes.Number(duration), output]); Processes.Run("ffmpeg", args, token).GetAwaiter().GetResult();
+
+        args.AddRange(["-t", Processes.Number(duration)]);
     }
 }
 public record ClipRange(double Start, double Duration, double Origin)

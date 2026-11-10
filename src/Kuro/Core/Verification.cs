@@ -63,6 +63,11 @@ public static class Verification
         Check(reopened.Active.Layers.Count == 4 && reopened.Assets[0].Path == assetPath, "Project persists stable layers and portable relative media paths");
         Near(reopened.Active.Layers.First(l => l.Id == title.Id).Get("y", 20), title.Get("y", 20), "Curve serialization preserves evaluation");
         Check(!File.ReadAllText(savePath).Contains("API_KEY"), "Project serialization excludes provider credentials");
+        var newPath = Path.ChangeExtension(savePath, Store.ProjectExtension);
+        Store.Save(reopened, newPath);
+        Check(Store.IsProjectPath(savePath) && Store.IsProjectPath(newPath) &&
+            JsonSerializer.Serialize(Store.Load(newPath), Data.Json) == JsonSerializer.Serialize(reopened, Data.Json),
+            "Legacy .kuro projects round-trip as .kr with media references intact");
         Check(ActionRegistry.Valid("Ctrl+Shift+D"), "Required split shortcut accepted"); Check(ActionRegistry.Valid("Ctrl+Alt+K"), "Custom shortcut syntax accepted");
         Check(ActionRegistry.Valid("P") && ActionRegistry.Valid("Space") && ActionRegistry.Valid("F9"), "Unmodified property/play/ease shortcuts accepted"); Check(ActionRegistry.Parse("Ctrl+0", out var fitKey, out _) && fitKey == System.Windows.Input.Key.D0, "Numeric shortcut maps to a physical digit key"); Check(!ActionRegistry.Valid("Ctrl+UnknownKey"), "Invalid shortcut rejected");
         Check(ActionRegistry.Parse("Backspace", out var backspace, out var backspaceMods) && backspace == System.Windows.Input.Key.Back && backspaceMods == System.Windows.Input.ModifierKeys.None, "Backspace resolves to the Windows delete-selection key binding");
@@ -176,6 +181,7 @@ public static class Verification
         await VerifyChatEdit();
         await VerifyChatFillPreview();
         await VerifyPlaybackAcrossCut(source);
+        await VerifyDecoderAndScrub(source);
         double previewFramesPerSecond;
         using (var worker = new PreviewWorker())
         using (var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(8)))
@@ -335,6 +341,10 @@ public static class Verification
         var waveform = await Media.Waveform(mix, timeout.Token);
         Check(waveform.Skip(75).Take(35).Any(peak => peak > .05) && waveform.Skip(145).All(peak => peak < .001),
             "Preview mix contains post-cut clip audio and silence after the final clip");
+        foreach (var layer in editor.Comp.Layers.Where(layer => layer.Kind == "Video")) layer.Volume = .5;
+        await Exporter.PreviewAudio(editor.Project, path, timeout.Token);
+        var quieter = await Media.Waveform(mix, timeout.Token);
+        Near(quieter.Skip(80).Take(20).Max(), waveform.Skip(80).Take(20).Max() / 2, "Selected clip volume scales the actual preview mix", .005);
 
         using var worker = new PreviewWorker();
         var playback = worker.Play(editor.Project, 16, 33, 1, timeout.Token);
@@ -348,6 +358,36 @@ public static class Verification
             }
         }
         Check(true, "Buffered video preview delivers frames on both sides of the split");
+    }
+
+    static async Task VerifyDecoderAndScrub(Asset source)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(16));
+        var path = Path.GetFullPath("artifacts/long-audio.mp4");
+        await Processes.Run("ffmpeg", ["-v", "error", "-y", "-i", source.Path, "-f", "lavfi", "-i", "sine=frequency=440:duration=3",
+            "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac", path], timeout.Token);
+        var legacy = await Media.Probe(path, timeout.Token);
+        Check(legacy.VideoDuration is > 1.9 and < 2.1 && legacy.Duration > 2.9, "Probe distinguishes the video end from a longer audio stream");
+        legacy.VideoDuration = null;
+        using (var decoder = new Decoder())
+        {
+            var tail = decoder.Read(legacy, 2.8, 160, 90, 30, timeout.Token, preview: true);
+            var held = decoder.Read(legacy, 2.9, 160, 90, 30, timeout.Token, preview: true);
+            Check(ReferenceEquals(tail, held), "Legacy decoder recovers and caches the final video frame beyond the video stream");
+        }
+
+        var editor = new Editor();
+        editor.Comp.Width = 320; editor.Comp.Height = 180;
+        editor.Project.Assets.Add(source);
+        editor.Execute(new("add_asset", source.Id));
+        using var worker = new PreviewWorker();
+        var exact = new TaskCompletionSource<FrameResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        worker.Ready += result => { if (result.Frame == 17) exact.TrySetResult(result); };
+        foreach (var frame in new[] { 8, 20, 36, 42, 31, 18 })
+            worker.Request(editor.Project, frame, 4, interrupt: false, scrubbing: true);
+        worker.Request(editor.Project, 17, 2);
+        var final = await exact.Task.WaitAsync(timeout.Token);
+        Check(final.Frame == 17 && final.Image is { PixelWidth: 160 } && final.Error == null, "Scrub burst resolves to the exact released frame at normal quality");
     }
 
     static void VerifyPropertyReveals()

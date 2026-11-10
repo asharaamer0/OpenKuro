@@ -4,7 +4,9 @@ OpenKuro is the source repository for Kuro, a native Windows video and motion ed
 
 ## Run
 
-After packaging locally, open `dist/Kuro-0.1.6/Kuro.exe`. The welcome screen lists recent projects and opens a blank timeline with New Project.
+Get the Windows installer from [GitHub Releases](https://github.com/asharaamer0/OpenKuro/releases/latest). Setup includes the .NET runtime and registers both `.kr` and `.kuro` project files. It can offer FFmpeg through Windows Package Manager when available.
+
+After packaging locally, open `dist/Kuro-0.2.0/Kuro.exe`. The welcome screen lists recent projects and opens a blank timeline with New Project.
 
 From source:
 
@@ -22,9 +24,9 @@ Requirements: Windows 10/11 x64, .NET 8 Desktop Runtime (SDK 8 to build), `ffmpe
 3. Select a layer and use Properties to edit transforms, text, shapes, timing, and available effects. Drag a numeric label to scrub its value; type a precise number in its field. Drag a selected visual layer in the viewer to move it. Double-click a selected text layer in the viewer to edit its text.
 4. Drag a clip to move it; drag its edges to trim. Ctrl-click selects multiple layers. **Ctrl+Shift+D** splits selected unlocked layers at the playhead. The upper layer renders in front.
 5. Select a layer and press S for Scale, P for Position, R for Rotation, T for Opacity, or U to toggle animated properties. Drag the number in either direction to adjust it and click its diamond to add or remove a keyframe. Right-click selected keys for graph and easing actions. Backspace deletes selected keyframes, or selected layers when no keys are selected. Position and Scale have independent X/Y link toggles.
-6. Save as `.kuro` with **Ctrl+S**. Export a real H.264/AAC MP4 with **Ctrl+M**. Choose composition, 4K, HD, or custom even dimensions and full composition or work area.
+6. Save as `.kr` with **Ctrl+S**. Export a real H.264/AAC MP4 with **Ctrl+M**. Choose composition, 4K, HD, or custom even dimensions and full composition or work area.
 
-Press **Ctrl+K** for the active composition’s resolution, aspect ratio, frame rate, duration, name, and background. FPS changes preserve clip and keyframe frame numbers. The **AI Editing** toolbar button toggles a resizable sidebar beside the viewer and timeline.
+Existing `.kuro` projects open normally and can be saved as `.kr` copies. Press **Ctrl+K** for the active composition’s resolution, aspect ratio, frame rate, duration, name, and background. FPS changes preserve clip and keyframe frame numbers. The **AI Editing** toolbar button toggles a resizable sidebar beside the viewer and timeline.
 
 The editable `examples/First light.kuro` project includes original procedural landscape artwork, an eight-second video, stacked titles, and transform/opacity curves. It is optional and never loaded into new projects automatically.
 
@@ -35,7 +37,7 @@ The editable `examples/First light.kuro` project includes original procedural la
 - Layer stacking, move/trim/split/duplicate/delete/ripple delete, selection, visibility/lock/audio/solo, snapping, markers, work area, timeline zoom, and precompositions.
 - Transform numerical controls, keyframes, linear/hold/cubic Bézier evaluation, editable value graph and diagnostic speed graph, freeze/reverse/constant speed.
 - Editable Unicode text with installed font selection/weight, drag-to-draw shapes, fill, and text/shape blur/glow/shadow. Double-click text in the preview to edit it in place. Use the preview zoom menu or wheel to zoom, and middle-drag to pan.
-- Shared preview/export compositor on a dedicated worker, Full/Half/Quarter preview, guides, frame stepping/time entry, audio preview prepared locally and played through Windows media, and export audio mixing.
+- Shared preview/export compositor on a dedicated worker, automatic hardware video decoding with CPU fallback, cached playhead scrubbing, Full/Half/Quarter preview, and per-clip volume for preview and export.
 - Atomic versioned projects with stable IDs, relative media references, undo/redo, 30-second recovery autosave, recent projects, and configurable/exportable shortcuts.
 - Right-click a video layer for Remove Background or Stabilize. Each processes the selected source trim and swaps the result into that layer as one undoable edit. Remove Background runs U²-Netp locally after a one-time model download. Stabilize uses FFmpeg block matching.
 - Configurable API-backed editing through the same command layer, real model discovery when available, a tool-call capability test, cancellation, revision checks, and Windows Credential Manager storage.
@@ -61,11 +63,12 @@ True Motion reads selector values and keyframes from supported FFX presets in an
 ```powershell
 .\tools\verify.ps1
 .\tools\build.ps1
+.\tools\build-installer.ps1 -Compiler 'C:\Path\To\ISCC.exe'
 ```
 
 The self-test generates real synthetic media, verifies timing/curves/transactions/persistence, and exports MP4s including a six-frame 4K composition. Results are in `artifacts/verification-report.json`. The short test is not a sustained performance benchmark. The full machine, checks, and visual review notes are in [docs/VERIFICATION.md](docs/VERIFICATION.md).
 
-`build.ps1` produces a framework-dependent Windows x64 build under `dist/Kuro-0.1.6` and a ZIP. It includes the sample project and copies optional preset files when available locally. FFmpeg is a separate runtime dependency.
+`build.ps1` produces a framework-dependent Windows x64 build under `dist/Kuro-0.2.0` and a ZIP. It includes the sample project and copies optional preset files when available locally. `build-installer.ps1` uses Inno Setup to create a self-contained Windows x64 setup executable. FFmpeg is a separate runtime dependency.
 
 ## License
 

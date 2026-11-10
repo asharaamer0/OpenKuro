@@ -22,6 +22,9 @@ public partial class MainWindow
         var motion = new CheckBox { Content = "Reduce interface motion", IsChecked = Preferences.Current.ReduceMotion }; motion.Click += (_, _) => { Preferences.Current.ReduceMotion = motion.IsChecked == true; Preferences.Current.Save(); }; appearance.Children.Add(motion);
         var loop = new CheckBox { Content = "Loop preview within the work area", IsChecked = Preferences.Current.Loop }; loop.Click += (_, _) => { Preferences.Current.Loop = loop.IsChecked == true; Preferences.Current.Save(); }; appearance.Children.Add(loop);
         appearance.Children.Add(Dialogs.Label("Preview quality changes viewer processing only. Export always uses its own dimensions and the original source."));
+        var hardwarePreview = new CheckBox { Content = "Use hardware video decoding when available", IsChecked = Preferences.Current.HardwarePreview };
+        hardwarePreview.Click += (_, _) => { Pause(); Preferences.Current.HardwarePreview = hardwarePreview.IsChecked == true; Preferences.Current.Save(); RequestPreview(); };
+        appearance.Children.Add(hardwarePreview);
         appearance.Children.Add(Dialogs.Label("Workspace", true)); appearance.Children.Add(Dialogs.Button("Balanced layout", () => { ProjectColumn.Width = new GridLength(264); InspectorColumn.Width = new GridLength(290); TimelineRow.Height = new GridLength(300); }));
         appearance.Children.Add(Dialogs.Button("Animation layout", () => { ProjectColumn.Width = new GridLength(220); InspectorColumn.Width = new GridLength(300); TimelineRow.Height = new GridLength(Math.Max(330, ActualHeight * .43)); }));
         appearance.Children.Add(Dialogs.Label("Cache", true)); appearance.Children.Add(Dialogs.Label(Store.Cache)); appearance.Children.Add(Dialogs.Button("Open cache folder", () => Process.Start(new ProcessStartInfo("explorer.exe", Store.Cache) { UseShellExecute = true })));
@@ -117,15 +120,25 @@ public partial class MainWindow
     }
     void ShowExport()
     {
-        Pause(); var window = Dialogs.Window("Export composition", this, 520, 730); var panel = new StackPanel { Margin = new Thickness(24) }; var snapshot = Data.Clone(editor.Project);
-        panel.Children.Add(Dialogs.Label("Export", true)); panel.Children.Add(Dialogs.Label("MP4 · H.264 video + AAC audio · Rec.709 SDR · square pixels"));
+        Pause(); var window = Dialogs.Window("Export composition", this, 520, 620); var panel = new StackPanel { Margin = new Thickness(24) }; var snapshot = Data.Clone(editor.Project);
+        panel.Children.Add(Dialogs.Label("Export MP4", true));
+        panel.Children.Add(Dialogs.Label($"H.264 · Rec.709 · {snapshot.Active.Fps.Value:0.###} fps · AAC stereo"));
+        (StackPanel Left, StackPanel Right) Columns()
+        {
+            var row = new System.Windows.Controls.Primitives.UniformGrid { Columns = 2 };
+            var left = new StackPanel { Margin = new Thickness(0, 0, 6, 0) };
+            var right = new StackPanel { Margin = new Thickness(6, 0, 0, 0) };
+            row.Children.Add(left); row.Children.Add(right); panel.Children.Add(row);
+            return (left, right);
+        }
         var size = Dialogs.Choice(panel, "Output resolution", ["Composition", "3840 × 2160", "1920 × 1080", "1280 × 720", "Custom"], "Composition");
-        var width = Dialogs.Field(panel, "Width · pixels", snapshot.Active.Width.ToString()); var height = Dialogs.Field(panel, "Height · pixels", snapshot.Active.Height.ToString());
+        var dimensionsRow = Columns();
+        var width = Dialogs.Field(dimensionsRow.Left, "Width · pixels", snapshot.Active.Width.ToString()); var height = Dialogs.Field(dimensionsRow.Right, "Height · pixels", snapshot.Active.Height.ToString());
         size.SelectionChanged += (_, _) => { var s = size.SelectedItem as string; var dimensions = s switch { "3840 × 2160" => (3840, 2160), "1920 × 1080" => (1920, 1080), "1280 × 720" => (1280, 720), _ => (snapshot.Active.Width, snapshot.Active.Height) }; if (s != "Custom") { width.Text = dimensions.Item1.ToString(); height.Text = dimensions.Item2.ToString(); } };
-        var range = Dialogs.Choice(panel, "Export range", ["Full composition", "Work area"], "Full composition"); var quality = Dialogs.Choice(panel, "Encoding quality", ["Master · CRF 16", "High · CRF 18", "Balanced · CRF 22"], "High · CRF 18");
-        panel.Children.Add(Dialogs.Label($"Frame rate: {snapshot.Active.Fps.Value:0.###} fps · matches composition. Audio: 48 kHz stereo, 320 kbps. MP4 does not preserve transparency; transparent areas render over black."));
+        var encodeRow = Columns();
+        var range = Dialogs.Choice(encodeRow.Left, "Export range", ["Full composition", "Work area"], "Full composition"); var quality = Dialogs.Choice(encodeRow.Right, "Quality", ["Master · CRF 16", "High · CRF 18", "Balanced · CRF 22"], "High · CRF 18");
         var output = Dialogs.Field(panel, "Destination", Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), snapshot.Name + ".mp4")); panel.Children.Add(Dialogs.Button("Choose destination…", () => { var picker = new SaveFileDialog { Filter = "H.264 MP4|*.mp4", DefaultExt = ".mp4", FileName = Path.GetFileName(output.Text) }; if (picker.ShowDialog(window) == true) output.Text = picker.FileName; }));
-        var progress = new ProgressBar { Minimum = 0, Maximum = 1, Margin = new Thickness(0, 12, 0, 8), Height = 4 }; panel.Children.Add(progress); var status = Dialogs.Label("Uses original sources and the shared composition renderer."); panel.Children.Add(status);
+        var progress = new ProgressBar { Minimum = 0, Maximum = 1, Margin = new Thickness(0, 12, 0, 8), Height = 4 }; panel.Children.Add(progress); var status = Dialogs.Label("Ready to export"); panel.Children.Add(status);
         CancellationTokenSource? cancel = null; Button? start = null; var stop = Dialogs.Button("Cancel export", () => cancel?.Cancel()); stop.IsEnabled = false;
         start = Dialogs.Button("Export MP4", async () =>
         {
@@ -137,7 +150,7 @@ public partial class MainWindow
             catch (Exception ex) { status.Text = "Export failed: " + ex.Message; }
             finally { cancel.Dispose(); cancel = null; start.IsEnabled = true; stop.IsEnabled = false; }
         }, true);
-        panel.Children.Add(start); panel.Children.Add(stop); window.Closing += (_, e) => { if (cancel != null) { cancel.Cancel(); e.Cancel = true; status.Text = "Canceling… close this window when the job has stopped."; } }; window.Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }; window.ShowDialog();
+        var buttons = Columns(); buttons.Left.Children.Add(start); buttons.Right.Children.Add(stop); window.Closing += (_, e) => { if (cancel != null) { cancel.Cancel(); e.Cancel = true; status.Text = "Canceling…"; } }; window.Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }; window.ShowDialog();
     }
     async void ProcessClip(Layer layer, bool removeBackground)
     {

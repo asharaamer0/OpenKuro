@@ -75,6 +75,7 @@ public class Asset
     public int Height { get; set; }
     public double Duration { get; set; }
     public double FrameRate { get; set; }
+    public double? VideoDuration { get; set; }
     public bool HasAudio { get; set; }
     public bool HasAlpha { get; set; }
     [JsonIgnore] public bool Missing => Kind != "Composition" && !File.Exists(Path);

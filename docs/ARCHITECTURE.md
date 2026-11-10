@@ -36,7 +36,7 @@ Nested composition visual time is converted through source seconds into the chil
 
 The UI passes snapshots to the preview worker. The pending queue is bounded to one request; obsolete renders are canceled. Results carry a request serial and exact frame index. UI presentation rejects late results. Playback drops video requests when rendering is busy and explicitly reports displayed versus requested frames. Audio is mixed locally to a revision-specific PCM cache before playback; Windows media position is the playback clock when audio is active. This is not yet a measured low-latency production playback engine.
 
-Decoding, media probing, waveform analysis, PCM mixing, stabilization and encoding run outside the UI thread. Per-renderer video decoder concurrency is bounded to eight, image caches to twelve, and import analyses to two. Source decoders use two FFmpeg threads. Frame buffers are not serialized as UI/project data. Current caches require manual management; complete GPU budgets, proxies, analysis scheduling and disk eviction remain in the roadmap.
+Decoding, media probing, waveform analysis, PCM mixing, stabilization and encoding run outside the UI thread. The preview requests FFmpeg automatic hardware decoding when enabled and retries on CPU when needed. Scrubbing keeps one pending request, caches nearby decoded frames, and renders the final playhead position at the selected quality. Source decoders and frame caches are bounded. The compositor itself still rasterizes on the CPU.
 
 The timeline uses custom retained drawing and culls offscreen rows. Its playhead is an independent visual. Asset lists use WPF recycling virtualization. Graph edits render drafts locally and commit one undo transaction on release. Viewer drag drafts change only the selected layer in an ephemeral project snapshot, then commit one transaction.
 
@@ -44,7 +44,7 @@ The timeline uses custom retained drawing and culls offscreen rows. Its playhead
 
 Export takes an immutable project snapshot. Preview resolution never changes export dimensions. The shared renderer supplies premultiplied BGRA frames flattened to black for ordinary MP4. FFmpeg encodes H.264/yuv420p with Rec.709 SDR metadata, square pixels and CRF quality. Original audio sources are trimmed, retimed with `atempo`, delayed and mixed at 48 kHz stereo into AAC. Time-remapped audio and non-unit-rate nested audio are excluded rather than falsely claimed as synchronized.
 
-Output uses unique `.partial.mp4` intermediates in the destination, then publishes only a completed file. Cancellation kills child processes and removes intermediates. Existing destinations are handled explicitly in the UI. Export validates dimensions, destination and conservative free space. This is SDR, not full color-managed HDR/wide-gamut grading.
+FFmpeg encodes and mixes directly into a unique `.partial.mp4` file. The completed file is then moved to the destination. Cancellation stops child processes and removes the partial file. Existing destinations are handled explicitly in the UI. Export validates dimensions, destination and free space.
 
 ## Local and remote boundary
 

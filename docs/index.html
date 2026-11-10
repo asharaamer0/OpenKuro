@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0b0d">
+  <meta name="description" content="OpenKuro is the open-source CapCut alternative for Windows. Cut footage, animate layers, and edit your timeline with an optional AI agent.">
+  <title>OpenKuro — An open timeline</title>
+  <link rel="icon" href="site/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="site/style.css">
+  <script defer src="site/demo.js"></script>
+</head>
+<body>
+  <header class="header wrap">
+    <a class="brand" href="./"><img src="site/mark.svg" alt="" width="28" height="28"> OpenKuro</a>
+    <nav aria-label="Main navigation"><a href="#demo">Demo</a><a href="#agent">AI editing</a><a href="https://github.com/asharaamer0/OpenKuro">GitHub ↗</a></nav>
+    <a class="nav-download" href="https://github.com/asharaamer0/OpenKuro/releases/latest">Download <span aria-hidden="true">↘</span></a>
+  </header>
+  <main>
+    <section class="hero" id="demo" aria-labelledby="title">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <div class="eyebrow"><i></i> OPEN-SOURCE VIDEO EDITOR</div>
+          <h1 id="title">The cut<br>is <em>yours.</em></h1>
+          <p>The open-source CapCut alternative for Windows. Cut a scene, shape the motion, or hand an edit to an AI agent.</p>
+          <a class="button primary" href="https://github.com/asharaamer0/OpenKuro/releases/latest">Download for Windows <span aria-hidden="true">↓</span></a>
+          <div class="hero-meta">WINDOWS 10/11 <span></span> MIT LICENSE</div>
+        </div>
+        <div class="demo-frame" aria-label="Interactive OpenKuro timeline demonstration">
+          <div class="demo-top"><span class="demo-lights" aria-hidden="true"><i></i><i></i><i></i></span><span>First light <b>/</b> Main</span><span class="demo-label">INTERACTIVE DEMO</span></div>
+          <div class="screen">
+            <video id="film" playsinline preload="metadata" muted poster="site/first-light.png" src="site/first-light.mp4" aria-label="First light sample footage"></video>
+            <div class="film-title" aria-hidden="true"><small>O P E N K U R O &nbsp; / &nbsp; 0 1</small><span>First light.</span></div>
+            <span class="screen-badge">REC.709</span>
+          </div>
+          <div class="transport"><button type="button" id="play" aria-label="Play sample" title="Play or pause">▶</button><time id="time">00:00:00</time><span>1920 × 1080</span></div>
+          <div class="timeline">
+            <div class="track-names" aria-hidden="true"><b>LAYERS</b><span><i></i>Title</span><span><i></i>Footage</span><span><i></i>Audio</span></div>
+            <div class="tracks" id="tracks">
+              <div class="ticks" aria-hidden="true"><span>0s</span><span>2s</span><span>4s</span><span>6s</span><span>8s</span></div>
+              <div class="lane"><div class="clip title-clip" id="title-clip">First light</div></div>
+              <div class="lane"><div class="clip footage-clip" id="footage-clip">Landscape.mp4</div><div class="clip split-clip" id="split-clip" hidden>Landscape.mp4</div></div>
+              <div class="lane"><div class="clip audio-clip">Sound bed <span></span></div></div>
+              <div class="head" aria-hidden="true"></div>
+              <input type="range" id="scrub" min="0" max="240" step="1" value="0" aria-label="Scrub timeline frame">
+            </div>
+          </div>
+          <div class="demo-bottom"><span><i></i> <span id="demo-status">Scrub the timeline or play the sample</span></span><span>30 FPS</span></div>
+        </div>
+      </div>
+      <div class="wrap hero-foot"><span>01 / THE TIMELINE</span><span>YOUR FOOTAGE STAYS LOCAL</span><span>SCROLL TO EXPLORE ↓</span></div>
+    </section>
+    <section class="wrap demo-section" aria-labelledby="controls-title">
+      <div class="section-id">01 / WORKSPACE</div>
+      <div class="section-heading"><h2 id="controls-title">From rough cut<br>to final frame.</h2><p>Try three editing moves on the timeline above.</p></div>
+      <div class="moves" aria-label="Timeline demonstrations">
+        <button type="button" class="move" data-demo="cut" aria-pressed="false"><span>01</span><strong>Split a clip</strong><small>Make a cut at the playhead.</small><b aria-hidden="true">↗</b></button>
+        <button type="button" class="move" data-demo="animate" aria-pressed="false"><span>02</span><strong>Animate a title</strong><small>Reveal the title’s keyframes.</small><b aria-hidden="true">↗</b></button>
+        <button type="button" class="move" data-demo="mix" aria-pressed="false"><span>03</span><strong>Adjust audio</strong><small>Bring down the clip volume.</small><b aria-hidden="true">↗</b></button>
+      </div>
+    </section>
+    <section class="agent-section" id="agent" aria-labelledby="agent-title">
+      <div class="wrap agent-grid">
+        <div>
+          <div class="section-id">02 / AI AGENTIC EDITING</div>
+          <h2 id="agent-title">Ask for an edit.<br><em>Keep the controls.</em></h2>
+          <p>Connect a compatible AI provider and ask in plain language. The agent can trim clips, change text, and edit keyframes through Kuro’s commands. Its edits are visible on the timeline and can be undone.</p>
+        </div>
+        <div class="agent-demo">
+          <div class="agent-top"><img src="site/mark.svg" alt="" width="20" height="20"> AI Editing <span>ILLUSTRATIVE DEMO</span></div>
+          <p class="prompt">“Split the landscape at 4 seconds.”</p>
+          <button id="run-agent" type="button">Run example <span aria-hidden="true">↗</span></button>
+          <div id="agent-result" class="agent-result" aria-live="polite">The example applies a cut in the timeline demo.</div>
+        </div>
+      </div>
+    </section>
+    <section class="wrap features" aria-label="Editor features">
+      <article><span>01</span><h3>Precision motion</h3><p>Layer transforms, editable keyframes, easing, and value and speed graphs.</p></article>
+      <article><span>02</span><h3>Local media tools</h3><p>Remove backgrounds, stabilize footage, and export H.264 MP4 on your machine.</p></article>
+      <article><span>03</span><h3>Open project files</h3><p>Save as .kr, reopen older .kuro projects, and keep your original media paths.</p></article>
+    </section>
+    <section class="wrap closing" aria-label="Download OpenKuro">
+      <div><div class="section-id">03 / OPENKURO FOR WINDOWS</div><h2>Start with a cut.</h2></div>
+      <a class="button primary" href="https://github.com/asharaamer0/OpenKuro/releases/latest">Get the installer <span aria-hidden="true">↓</span></a>
+    </section>
+  </main>
+  <footer class="wrap footer"><a class="brand" href="./"><img src="site/mark.svg" alt="" width="22" height="22"> OpenKuro</a><span>Built for Windows · MIT License</span><a href="https://github.com/asharaamer0/OpenKuro">Source on GitHub ↗</a></footer>
+</body>
+</html>

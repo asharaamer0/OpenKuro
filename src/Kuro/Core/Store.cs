@@ -4,6 +4,9 @@ using System.Text.Json;
 namespace Kuro.Core;
 public static class Store
 {
+    public const string ProjectExtension = ".kr";
+    public const string ProjectFilter = "Kuro projects (*.kr;*.kuro)|*.kr;*.kuro";
+    public static bool IsProjectPath(string path) => Path.GetExtension(path).ToLowerInvariant() is ".kr" or ".kuro";
     public static string Home => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Kuro");
     public static string Cache { get { var p = Path.Combine(Home, "Cache"); Directory.CreateDirectory(p); return p; } }
     public static void AtomicWrite(string path, string content)
@@ -51,6 +54,7 @@ public class Preferences
     public double AIWidth { get; set; } = 340;
     public double TimelineHeight { get; set; } = 322;
     public int PreviewDivisor { get; set; } = 2;
+    public bool HardwarePreview { get; set; } = true;
     public bool Loop { get; set; } = true;
     public string ChatEndpoint { get; set; } = "";
     public string ChatModel { get; set; } = "";

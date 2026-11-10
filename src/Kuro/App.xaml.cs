@@ -39,7 +39,7 @@ public partial class App : Application
         if (themeArg >= 0 && themeArg + 1 < e.Args.Length && e.Args[themeArg + 1] is "Light" or "Dark" or "Follow Windows") Preferences.Current.Theme = e.Args[themeArg + 1];
         Theme.Apply(Preferences.Current.Theme);
         var window = new MainWindow(); MainWindow = window;
-        var path = e.Args.FirstOrDefault(arg => Path.GetExtension(arg).Equals(".kuro", StringComparison.OrdinalIgnoreCase) && File.Exists(arg));
+        var path = e.Args.FirstOrDefault(arg => Store.IsProjectPath(arg) && File.Exists(arg));
         if (path == null || !window.LoadProject(path)) window.ShowWelcome();
         window.Show();
         var frameArg = Array.IndexOf(e.Args, "--frame"); var selectionArg = Array.IndexOf(e.Args, "--select");

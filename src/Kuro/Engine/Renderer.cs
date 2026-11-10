@@ -10,6 +10,8 @@ namespace Kuro.Engine;
 // One evaluator is used for viewer frames and final output; no UI controls are read here.
 public sealed class Renderer(bool preview = false) : IDisposable
 {
+    internal bool HardwareDecode { get; set; }
+    internal bool Scrubbing { get; set; }
     readonly Dictionary<string, Decoder> decoders = [];
     readonly Dictionary<string, BitmapSource> images = [];
     public BitmapSource Render(Project project, Composition composition, long frame, int width, int height, CancellationToken token = default, int depth = 0)
@@ -46,7 +48,7 @@ public sealed class Renderer(bool preview = false) : IDisposable
                         }
                         var w = Math.Max(2, (int)Math.Round(a.Width * factor)); var h = Math.Max(2, (int)Math.Round(a.Height * factor));
                         var samplingFps = l.Rate > 0 ? composition.Fps.Value / l.Rate : composition.Fps.Value;
-                        image = decoder.Read(a, l.SourceTime(frame, composition.Fps), w, h, samplingFps, token, preview);
+                        image = decoder.Read(a, l.SourceTime(frame, composition.Fps), w, h, samplingFps, token, preview, HardwareDecode, Scrubbing);
                     }
                     dc.DrawImage(image, new Rect(-a.Width / 2.0, -a.Height / 2.0, a.Width, a.Height));
                 }
@@ -165,7 +167,8 @@ public sealed class Renderer(bool preview = false) : IDisposable
 public record FrameResult(long Frame, BitmapSource? Image, string? Error, long Request);
 public sealed class PreviewWorker : IDisposable
 {
-    record Work(Project Project, long Frame, int Divisor, long Request, CancellationTokenSource Cancel, PlaybackBuffer? Playback = null, long End = 0);
+    record Work(Project Project, long Frame, int Divisor, long Request, CancellationTokenSource Cancel,
+        PlaybackBuffer? Playback = null, long End = 0, bool Scrubbing = false, bool Hardware = false);
     readonly BlockingCollection<Work> queue = new(1);
     readonly Thread thread; CancellationTokenSource? active; long serial; bool disposed;
     public event Action<FrameResult>? Ready;
@@ -173,21 +176,22 @@ public sealed class PreviewWorker : IDisposable
     {
         thread = new Thread(Loop) { IsBackground = true, Name = "Kuro · preview compositor" }; thread.SetApartmentState(ApartmentState.STA); thread.Start();
     }
-    public void Request(Project p, long frame, int divisor, bool interrupt = true)
+    public long Request(Project p, long frame, int divisor, bool interrupt = true, bool scrubbing = false, bool hardware = false)
     {
-        if (disposed) return;
+        if (disposed) return 0;
         var request = Interlocked.Increment(ref serial);
         if (interrupt) CancelActive();
-        Enqueue(new(p, frame, divisor, request, new()));
+        Enqueue(new(p, frame, divisor, request, new(), Scrubbing: scrubbing, Hardware: hardware));
+        return request;
     }
-    public PlaybackBuffer Play(Project project, long start, long end, int divisor, CancellationToken token)
+    public PlaybackBuffer Play(Project project, long start, long end, int divisor, CancellationToken token, bool hardware = false)
     {
         var c = project.Active;
         var frameBytes = (long)Math.Max(2, c.Width / divisor) * Math.Max(2, c.Height / divisor) * 4;
         var capacity = (int)Math.Clamp((40L * 1024 * 1024) / frameBytes, 2, 10);
         var buffer = new PlaybackBuffer(capacity, (int)Math.Min(Math.Min(capacity, 5), end - start), start);
         CancelActive();
-        Enqueue(new(project, start, divisor, Interlocked.Increment(ref serial), CancellationTokenSource.CreateLinkedTokenSource(token), buffer, end));
+        Enqueue(new(project, start, divisor, Interlocked.Increment(ref serial), CancellationTokenSource.CreateLinkedTokenSource(token), buffer, end, Hardware: hardware));
         return buffer;
     }
     void Enqueue(Work work)
@@ -208,6 +212,8 @@ public sealed class PreviewWorker : IDisposable
             try
             {
                 var c = w.Project.Active;
+                renderer.HardwareDecode = w.Hardware;
+                renderer.Scrubbing = w.Scrubbing;
                 BitmapSource Render(long frame) => renderer.Render(w.Project, c, frame, Math.Max(2, c.Width / w.Divisor), Math.Max(2, c.Height / w.Divisor), w.Cancel.Token);
                 if (w.Playback is { } buffer)
                 {
@@ -221,7 +227,7 @@ public sealed class PreviewWorker : IDisposable
                 else
                 {
                     var result = Render(w.Frame);
-                    if (w.Request == Interlocked.Read(ref serial) && !w.Cancel.IsCancellationRequested) Ready?.Invoke(new(w.Frame, result, null, w.Request));
+                    if ((w.Scrubbing || w.Request == Interlocked.Read(ref serial)) && !w.Cancel.IsCancellationRequested) Ready?.Invoke(new(w.Frame, result, null, w.Request));
                 }
             }
             catch (Exception ex)
