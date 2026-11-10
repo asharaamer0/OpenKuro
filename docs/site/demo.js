@@ -67,7 +67,7 @@ document.querySelector("#run-agent").addEventListener("click", () => {
   const result = document.querySelector("#agent-result");
   result.textContent = "✓ Applied split_clip at frame 120 (4.00s). ";
   const link = document.createElement("a");
-  link.href = "#demo";
+  link.href = "#timeline-demo";
   link.textContent = "View timeline ↑";
   result.append(link);
 });
