@@ -64,8 +64,9 @@ for (const move of moves) move.addEventListener("click", () => {
 });
 document.querySelector("#run-agent").addEventListener("click", () => {
   applyMode("cut", 120);
+  document.querySelector("#agent-demo").setAttribute("data-cut", "");
   const result = document.querySelector("#agent-result");
-  result.textContent = "✓ Applied split_clip at frame 120 (4.00s). ";
+  result.textContent = "Split at 4 seconds (frame 120). ";
   const link = document.createElement("a");
   link.href = "#timeline-demo";
   link.textContent = "View timeline ↑";
